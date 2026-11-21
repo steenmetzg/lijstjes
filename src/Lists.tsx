@@ -1,7 +1,5 @@
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import {
-  Bell,
-  BellOff,
   GripVertical,
   Info as InfoIcon,
   Mic,
@@ -45,9 +43,6 @@ interface Props {
   notice: Notice | null
   onCloseNotice: () => void
   mic: { show: boolean; listening: boolean; start: () => void; stop: () => void }
-  /** Het belletje bij Nieuw lijstje staat aan: het nieuwe lijstje wordt een herinneringslijstje (F32). */
-  nieuwHerinnering: boolean
-  onToggleHerinnering: () => void
   /** De melding met herinneringen (F36). */
   reminders?: ReactNode
 }
@@ -156,12 +151,6 @@ function ListRow({
           aria-current={current ? 'true' : undefined}
           onClick={onOpen}
         >
-          {lijstje.herinnering ? (
-            <Bell className="list-bell" size={15} strokeWidth={2} aria-label="Herinneringslijstje" />
-          ) : (
-            // Grijs en zonder actie: een herinneringslijstje maak je op het lijstje zelf (F38).
-            <BellOff className="list-bell off" size={15} strokeWidth={2} aria-hidden />
-          )}
           <span className="list-name">{lijstje.naam}</span>
           {open > 0 && (
             <span className="count" aria-hidden>
@@ -211,8 +200,6 @@ export default function Lists({
   notice,
   onCloseNotice,
   mic,
-  nieuwHerinnering,
-  onToggleHerinnering,
   reminders,
 }: Props) {
   const [naam, setNaam] = useState('')
@@ -317,23 +304,12 @@ export default function Lists({
           style={{ bottom: scroll.bottomHeight }}
         >
           <MoreBelow count={hidden.below} words={['lijstje', 'lijstjes']} onClick={() => scroll.scrollPage(1)} />
-          {/* Het belletje staat links, op de plek van de greep (F32). */}
-          <span className="item-grip bell-slot">
-            <button
-              type="button"
-              className={nieuwHerinnering ? 'icon-button bell on' : 'icon-button bell'}
-              aria-label="Herinneringslijstje"
-              aria-pressed={nieuwHerinnering}
-              onClick={onToggleHerinnering}
-            >
-              <Bell size={15} strokeWidth={2} aria-hidden />
-            </button>
-          </span>
+          <span className="item-grip" aria-hidden />
           <form className="add-item" onSubmit={create}>
             <input
               type="text"
               aria-label="Naam van het nieuwe lijstje"
-              placeholder={nieuwHerinnering ? 'Nieuw herinneringslijstje' : 'Nieuw lijstje'}
+              placeholder="Nieuw lijstje"
               enterKeyHint="go"
               autoComplete="off"
               maxLength={MAX_NAAM}

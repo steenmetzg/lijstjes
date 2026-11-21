@@ -10,7 +10,7 @@ export function itemTexts(): string[] {
     .getAllByRole('listitem')
     // De laatste regel is de invoerregel, geen item.
     .filter((li) => !li.classList.contains('add-row'))
-    .map((li) => li.querySelector('.item-text')?.textContent ?? '')
+    .map((li) => li.querySelector('.item-tekst')?.textContent ?? '')
 }
 
 /** De knop om een item af te vinken (het rondje). */

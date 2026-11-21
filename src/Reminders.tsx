@@ -37,7 +37,7 @@ export default function Reminders({ due, onOpen, onToggle, onClose }: Props) {
               </button>
               <button type="button" className={d.voorbij ? 'reminder past' : 'reminder'} onClick={() => onOpen(d.lijstjeId)}>
                 <span className="reminder-when">
-                  {d.voorbij ? formatWanneer(d.item.wanneer) : `Vandaag ${d.item.wanneer.slice(11)}`}
+                  {d.voorbij ? formatWanneer(d.item.wanneer) : `Vandaag${d.item.wanneer.length > 10 ? ` ${d.item.wanneer.slice(11)}` : ''}`}
                 </span>{' '}
                 <span className="reminder-text">{d.item.tekst}</span>{' '}
                 <span className="reminder-list">({d.lijstjeNaam})</span>
