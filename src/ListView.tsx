@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   CalendarDays,
   Check,
+  Clock,
   GripVertical,
   Mic,
   SlidersHorizontal,
@@ -324,18 +325,15 @@ function MomentVeld({
           onChange(e.target.value ? (datum ? datumTekst(e.target.value, zonderJaar) : e.target.value) : '')
         }
       />
-      {/* Een tijd typ je snel; alleen bij een datum een kalendertje (ruimte op één regel). */}
-      {datum && (
-        <button
-          type="button"
-          className="moment-open"
-          aria-label="Datum kiezen"
-          disabled={disabled}
-          onClick={() => openPicker(picker.current)}
-        >
-          <CalendarDays size={18} strokeWidth={1.75} aria-hidden />
-        </button>
-      )}
+      <button
+        type="button"
+        className="moment-open"
+        aria-label={datum ? 'Datum kiezen' : 'Tijd kiezen'}
+        disabled={disabled}
+        onClick={() => openPicker(picker.current)}
+      >
+        {datum ? <CalendarDays size={17} strokeWidth={1.75} aria-hidden /> : <Clock size={17} strokeWidth={1.75} aria-hidden />}
+      </button>
     </span>
   )
 }

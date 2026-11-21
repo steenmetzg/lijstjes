@@ -883,7 +883,7 @@ h2 {
 
 .field {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-columns: 54px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   margin-top: 6px;
@@ -1237,19 +1237,14 @@ span.item-grip {
 
 .date-field.met-tijd .moment-veld + .moment-veld {
   flex: none;
-  width: 62px;
+  width: 76px;
 }
 
 .field .moment-veld input[type='text'] {
   flex: 1;
   width: 0;
-  padding: 0 30px 0 7px;
+  padding: 0 24px 0 6px;
   font-size: 0.95rem;
-}
-
-.field .moment-veld + .moment-veld input[type='text'] {
-  padding-right: 7px;
-  text-align: center;
 }
 
 .moment-open {
@@ -1258,8 +1253,9 @@ span.item-grip {
   right: 0;
   display: grid;
   place-items: center;
-  width: 30px;
+  width: 25px;
   height: 100%;
+  padding: 0 4px 0 0;
   border: none;
   color: var(--accent);
 }
@@ -1297,5 +1293,5 @@ html.vak-open body {
 }
 
 .date-field.met-tijd .date-clear {
-  width: 32px;
+  width: 28px;
 }
