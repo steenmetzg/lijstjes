@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent, type ReactNode, type TouchEvent } from 'react'
-import { ArrowLeft, CalendarCheck, CalendarDays, Check, Clock, GripVertical, Mic, Pencil, Trash2, X } from 'lucide-react'
+import { ArrowLeft, CalendarCheck, Check, GripVertical, Mic, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { AGENDAS, agendaLabel, formatWanneer, isVoorbij, opDatum, PER_ITEM, zichtbaar, type AgendaKeuze } from './agenda'
 import {
   heeftDatum,
@@ -45,9 +45,15 @@ interface Props {
   /** Tekst en kenmerken van een item bewaren uit het vak met de kenmerken (F42). */
   onDetails: (id: string, tekst: string, details: Details) => void
   /**
-   * De agenda van het lijstje kiezen en, met een item, dat item erin zetten met de datum (en tijd) die je ziet (F34).
+   * Een nieuw item met kenmerken uit het vak Nieuw item (F42); geeft id en tekst van het nieuwe item, of `null` als
+   * het niet kan (de melding staat dan onderaan).
    */
-  onAgenda: (agenda: AgendaKeuze | null, itemId: string | null, wanneer?: string) => void
+  onAddDetails: (tekst: string, details: Details) => { id: string; tekst: string } | null
+  /**
+   * De agenda van het lijstje kiezen en, met een item, dat item erin zetten met de datum (en tijd) die je ziet (F34).
+   * `titel` is de tekst van het item, ook als die net is gewijzigd of het item net is gemaakt.
+   */
+  onAgenda: (agenda: AgendaKeuze | null, itemId: string | null, wanneer?: string, titel?: string) => void
   /** De melding met herinneringen (F36). */
   reminders?: ReactNode
   /** Nieuwe naam en kenmerken voor het lijstje; `false` als de naam niet kan (de melding staat dan onderaan) (F37, F41). */
@@ -207,9 +213,9 @@ function ItemRow({ item, shift, dragging, onToggle, onEdit, onRemove, grip, opDa
   )
 }
 
-/** Het vak met de kenmerken van een item: wat er in de velden staat. */
+/** Het vak met de kenmerken van een item: wat er in de velden staat. `id` is `null` bij een nieuw item. */
 interface Detail {
-  id: string
+  id: string | null
   tekst: string
   datum: string
   tijd: string
@@ -242,21 +248,20 @@ export default function ListView({
   onBack,
   mic,
   onDetails,
+  onAddDetails,
   onAgenda,
   reminders,
   onInstellen,
 }: Props) {
   const [text, setText] = useState('')
   const [clearing, setClearing] = useState(false)
-  // Naam en kenmerken van het lijstje, via de titel met het potloodje (F37, F41).
+  // Naam en kenmerken van het lijstje, via de schuifjesknop (F37, F41).
   const [instellen, setInstellen] = useState<{ naam: string; kenmerken: Kenmerken } | null>(null)
   // De keuze van de agenda: `voor` is het item dat daarna in de agenda gaat (met `wanneer`), of `null` (F34).
-  const [choosing, setChoosing] = useState<{ voor: string | null; wanneer?: string } | null>(null)
+  const [choosing, setChoosing] = useState<{ voor: string | null; wanneer?: string; titel?: string } | null>(null)
   // Het vak met de kenmerken van een item (F42).
   const [detail, setDetail] = useState<Detail | null>(null)
   const detailItem = detail ? lijstje.items.find((i) => i.id === detail.id) : undefined
-  const dateInput = useRef<HTMLInputElement>(null)
-  const timeInput = useRef<HTMLInputElement>(null)
   const datum = heeftDatum(lijstje)
   const tijd = heeftTijd(lijstje)
   const kenmerken: Required<Kenmerken> = {
@@ -314,25 +319,47 @@ export default function ListView({
     return t ? `${d.datum}T${t}` : d.datum
   }
 
-  /** Bewaart het vak met de kenmerken en zet het item zo nodig meteen in de agenda (F34, F42). */
+  /**
+   * Bewaart het vak met de kenmerken (of maakt het nieuwe item) en zet het item zo nodig meteen in de agenda
+   * (F34, F42).
+   */
   function saveDetail(enAgenda: boolean) {
     if (!detail) return
     const wanneer = detailWanneer(detail)
+    const details = { wanneer, notitie: detail.notitie, aantal: detail.aantal }
+    let item: { id: string; tekst: string }
+    if (detail.id === null) {
+      // Een leeg veld of een item dat er al op staat: het vak blijft open, met de melding onderaan.
+      const nieuw = onAddDetails(detail.tekst, details)
+      if (!nieuw) return
+      item = nieuw
+      // Klaar voor het volgende item (F3).
+      input.current?.focus()
+    } else {
+      onDetails(detail.id, detail.tekst, details)
+      item = { id: detail.id, tekst: detail.tekst.trim() || (detailItem?.tekst ?? '') }
+    }
     setDetail(null)
-    onDetails(detail.id, detail.tekst, { wanneer, notitie: detail.notitie, aantal: detail.aantal })
     if (enAgenda && wanneer) {
       const zien = zichtbaar(wanneer, tijd)
       // Een vaste agenda: meteen erin; nog niets gekozen of Per item kiezen: eerst vragen welke (F34).
-      if (lijstje.agenda && lijstje.agenda !== PER_ITEM) onAgenda(lijstje.agenda, detail.id, zien)
-      else setChoosing({ voor: detail.id, wanneer: zien })
+      if (lijstje.agenda && lijstje.agenda !== PER_ITEM) onAgenda(lijstje.agenda, item.id, zien, item.tekst)
+      else setChoosing({ voor: item.id, wanneer: zien, titel: item.tekst })
     }
+  }
+
+  /** Begin je te typen op een lijstje met kenmerken, dan opent het vak Nieuw item met wat je typte (F42). */
+  function startNew(value: string) {
+    closeAll()
+    setDetail({ id: null, tekst: value.slice(0, MAX_TEKST), datum: '', tijd: '', notitie: '', aantal: '' })
   }
 
   function choose(agenda: AgendaKeuze) {
     const voor = choosing?.voor ?? null
     const wanneer = choosing?.wanneer
+    const titel = choosing?.titel
     setChoosing(null)
-    onAgenda(agenda, voor, wanneer)
+    onAgenda(agenda, voor, wanneer, titel)
   }
 
   const detailZien = detail ? detailWanneer(detail) : undefined
@@ -345,9 +372,13 @@ export default function ListView({
           <ArrowLeft size={20} strokeWidth={1.75} aria-hidden />
         </button>
         <h1>
+          <span className="title-text">{lijstje.naam}</span>
+        </h1>
+        <div className="header-actions">
+          {/* Naam en kenmerken van het lijstje, links van het prullenbakje (F37, F41). */}
           <button
             type="button"
-            className="title-button"
+            className="icon-button"
             aria-label={`Naam en kenmerken van ${lijstje.naam}`}
             aria-expanded={instellen !== null}
             onClick={() => {
@@ -356,11 +387,8 @@ export default function ListView({
               if (!open) setInstellen({ naam: lijstje.naam, kenmerken: { ...kenmerken, tijd: lijstje.kenmerken?.tijd === true } })
             }}
           >
-            <span className="title-text">{lijstje.naam}</span>
-            <Pencil className="title-pencil" size={15} strokeWidth={1.75} aria-hidden />
+            <SlidersHorizontal size={20} strokeWidth={1.75} aria-hidden />
           </button>
-        </h1>
-        <div className="header-actions">
           <button
             type="button"
             className="icon-button"
@@ -469,8 +497,11 @@ export default function ListView({
             </form>
           </section>
         )}
-        {detail && detailItem && (
-          <section className="confirm clear-choice details" aria-label={`Details van ${detailItem.tekst}`}>
+        {detail && (detail.id === null || detailItem) && (
+          <section
+            className="confirm clear-choice details"
+            aria-label={detailItem ? `Details van ${detailItem.tekst}` : 'Nieuw item'}
+          >
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -485,6 +516,8 @@ export default function ListView({
                   enterKeyHint="done"
                   autoComplete="off"
                   maxLength={MAX_TEKST}
+                  // Een nieuw item: verder typen in dit veld (F42).
+                  autoFocus={detail.id === null}
                   value={detail.tekst}
                   onChange={(e) => setDetail({ ...detail, tekst: e.target.value.slice(0, MAX_TEKST) })}
                 />
@@ -505,59 +538,34 @@ export default function ListView({
                 </label>
               )}
               {datum && (
+                // Datum en tijd op één regel; tikken op een veld opent de kiezer van de telefoon (F33).
                 <div className="field">
                   <span>Datum</span>
-                  <div className="date-field">
+                  <div className={tijd ? 'date-field met-tijd' : 'date-field'}>
                     <input
-                      ref={dateInput}
                       type="date"
                       aria-label="Datum"
                       value={detail.datum}
+                      onClick={(e) => openPicker(e.currentTarget)}
                       onChange={(e) => setDetail({ ...detail, datum: e.target.value })}
                     />
-                    <button type="button" className="date-clear date-open" aria-label="Datum kiezen" onClick={() => openPicker(dateInput.current)}>
-                      <CalendarDays size={18} strokeWidth={1.75} aria-hidden />
-                    </button>
+                    {tijd && (
+                      <input
+                        type="time"
+                        aria-label="Tijd"
+                        // Een tijd hoort bij een datum (F41).
+                        disabled={!detail.datum}
+                        value={detail.tijd}
+                        onClick={(e) => openPicker(e.currentTarget)}
+                        onChange={(e) => setDetail({ ...detail, tijd: e.target.value })}
+                      />
+                    )}
                     <button
                       type="button"
                       className="date-clear"
-                      aria-label="Datum weghalen"
-                      disabled={!detail.datum}
+                      aria-label={tijd ? 'Datum en tijd weghalen' : 'Datum weghalen'}
+                      disabled={!detail.datum && !detail.tijd}
                       onClick={() => setDetail({ ...detail, datum: '', tijd: '' })}
-                    >
-                      <X size={18} strokeWidth={1.75} aria-hidden />
-                    </button>
-                  </div>
-                </div>
-              )}
-              {tijd && (
-                <div className="field">
-                  <span>Tijd</span>
-                  <div className="date-field">
-                    <input
-                      ref={timeInput}
-                      type="time"
-                      aria-label="Tijd"
-                      // Een tijd hoort bij een datum (F41).
-                      disabled={!detail.datum}
-                      value={detail.tijd}
-                      onChange={(e) => setDetail({ ...detail, tijd: e.target.value })}
-                    />
-                    <button
-                      type="button"
-                      className="date-clear date-open"
-                      aria-label="Tijd kiezen"
-                      disabled={!detail.datum}
-                      onClick={() => openPicker(timeInput.current)}
-                    >
-                      <Clock size={18} strokeWidth={1.75} aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      className="date-clear"
-                      aria-label="Tijd weghalen"
-                      disabled={!detail.tijd}
-                      onClick={() => setDetail({ ...detail, tijd: '' })}
                     >
                       <X size={18} strokeWidth={1.75} aria-hidden />
                     </button>
@@ -576,7 +584,7 @@ export default function ListView({
                   />
                 </label>
               )}
-              {detailInAgenda && detailItem.inAgenda && <p>Staat al in je agenda op {formatWanneer(detailItem.inAgenda)}.</p>}
+              {detailInAgenda && detailItem?.inAgenda && <p>Staat al in je agenda op {formatWanneer(detailItem.inAgenda)}.</p>}
               <div className="confirm-buttons">
                 {datum && (
                   <button
@@ -688,8 +696,14 @@ export default function ListView({
               enterKeyHint="enter"
               autoComplete="off"
               value={text}
-              // Elk item mag maximaal 60 tekens hebben, ook als je er meerdere met komma's typt (F3, F4).
-              onChange={(e) => setText(limitTyped(e.target.value))}
+              // Elk item mag maximaal 60 tekens hebben, ook als je er meerdere met komma's typt (F3, F4). Met kenmerken
+              // opent het eerste teken het vak Nieuw item, waarin je verder typt (F42).
+              onChange={(e) => {
+                if (metKenmerken && e.target.value.trim()) {
+                  setText('')
+                  startNew(e.target.value)
+                } else setText(limitTyped(e.target.value))
+              }}
             />
             {mic.show && (
               <button

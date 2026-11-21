@@ -16,7 +16,11 @@ import {
   heeftTijd,
   saveCurrent,
   saveLijstjes,
+  capitalize,
+  MAX_TEKST,
+  sameText,
   setDetails,
+  splitAantal,
   splitTyped,
   staatInAgenda,
   type Details,
@@ -112,7 +116,7 @@ export default function App() {
 
   function create(naam: string) {
     const id = newId()
-    // Een nieuw lijstje is altijd een gewoon lijstje; kenmerken kies je daarna met het potloodje (F10, F41).
+    // Een nieuw lijstje is altijd een gewoon lijstje; kenmerken kies je daarna met de schuifjesknop (F10, F41).
     setLijstjes((all) => [...all, { id, naam, items: [] }])
     openList(id)
   }
@@ -173,6 +177,32 @@ export default function App() {
     }
   }
 
+  /**
+   * Een nieuw item uit het vak Nieuw item, met zijn kenmerken (F42). Met Aantal en een leeg aantal wordt een getal
+   * vooraan het aantal (F43). Staat het item er al, dan blijft het vak open met de melding (F5).
+   */
+  function addWithDetails(tekst: string, details: Details): { id: string; tekst: string } | null {
+    const t = tekst.trim().slice(0, MAX_TEKST).trim()
+    if (!t) {
+      setNotice({ kind: 'error', text: 'Typ eerst wat het item is.' })
+      return null
+    }
+    const split = lijstje.kenmerken?.aantal && !details.aantal?.trim() ? splitAantal(t) : { tekst: t, aantal: details.aantal }
+    const bestaand = lijstje.items.find((i) => sameText(i.tekst, split.tekst))
+    if (bestaand) {
+      setNotice({ kind: 'error', text: `${capitalize(bestaand.tekst)} staat er al op.` })
+      return null
+    }
+    const id = newId()
+    const next = setDetails({ ...lijstje, items: [...lijstje.items, { id, tekst: split.tekst, af: false }] }, id, {
+      ...details,
+      aantal: split.aantal,
+    })
+    update(lijstje.id, () => next)
+    setNotice(null)
+    return { id, tekst: split.tekst }
+  }
+
   /** Nieuwe naam en kenmerken van het huidige lijstje; `false` als de naam niet kan (F37, F41). */
   function instellen(naam: string, kenmerken: Kenmerken): boolean {
     const l = lijstje
@@ -218,7 +248,7 @@ export default function App() {
    * Kiest de agenda van het lijstje en zet zo nodig een item erin (F34), met de datum (en tijd) die je ziet: zonder
    * tijd als het kenmerk Tijd uit staat (dan een agenda-item voor de hele dag).
    */
-  function agenda(keuze: AgendaKeuze | null, itemId: string | null, nieuweDatum?: string) {
+  function agenda(keuze: AgendaKeuze | null, itemId: string | null, nieuweDatum?: string, nieuweTitel?: string) {
     const l = lijstje
     const tijd = heeftTijd(l)
     // Bij Per item kiezen blijft dat de keuze van het lijstje; de agenda geldt alleen voor dit item (F34).
@@ -229,18 +259,20 @@ export default function App() {
     if (!welke || !isAgenda(welke)) return
     // Net bewaard in het vak met de kenmerken: die datum, ook al staat hij nog niet in `lijstje`.
     const wanneer = nieuweDatum ?? (item?.wanneer && zichtbaar(item.wanneer, tijd))
-    if (!item || !wanneer) return
+    // Een net gemaakt of gewijzigd item staat nog niet (zo) in `lijstje`: dan de tekst uit het vak.
+    const titel = nieuweTitel ?? item?.tekst
+    if (!itemId || !wanneer || !titel) return
     // Niet wachten vóór het openen: anders houdt de browser het nieuwe venster tegen.
-    void zetInAgenda(welke, { id: item.id, titel: item.tekst, lijstje: l.naam, wanneer }).then((ok) => {
+    void zetInAgenda(welke, { id: itemId, titel, lijstje: l.naam, wanneer }).then((ok) => {
       if (ok) {
         update(l.id, (x) => ({
           ...x,
           items: x.items.map((i) =>
-            i.id === item.id && i.wanneer && zichtbaar(i.wanneer, tijd) === wanneer ? { ...i, inAgenda: wanneer } : i,
+            i.id === itemId && i.wanneer && zichtbaar(i.wanneer, tijd) === wanneer ? { ...i, inAgenda: wanneer } : i,
           ),
         }))
       } else if (welke === 'delen' && typeof navigator.share !== 'function') {
-        setNotice({ kind: 'error', text: 'Delen kan niet op deze telefoon. Kies een andere agenda via het potloodje bij de naam van het lijstje.' })
+        setNotice({ kind: 'error', text: 'Delen kan niet op deze telefoon. Kies een andere agenda met de schuifjesknop bovenaan het lijstje.' })
       }
     })
   }
@@ -335,6 +367,7 @@ export default function App() {
       reminders={reminders}
       onInstellen={instellen}
       onDetails={saveDetails}
+      onAddDetails={addWithDetails}
       onAgenda={agenda}
       mic={{
         show: speechEnabled && speechSupported(),

@@ -64,7 +64,7 @@ async function kenmerken(user: User, naam: string, wissel: string[]) {
 }
 
 describe('AC25: kenmerken kiezen', () => {
-  it('een nieuw lijstje is gewoon; met het potloodje kies je Datum, Tijd, Notitie en Aantal', async () => {
+  it('een nieuw lijstje is gewoon; met de schuifjesknop kies je Datum, Tijd, Notitie en Aantal', async () => {
     const user = userEvent.setup()
     render(<App />)
     // Geen belletje meer bij Nieuw lijstje.
@@ -208,7 +208,7 @@ describe('AC27: in de agenda zetten', () => {
     expect(new URL(open.mock.calls[1][0]).searchParams.get('text')).toBe('APK')
     expect(screen.getByText('vr 20 nov 08:00')).toBeInTheDocument()
 
-    // Via het potloodje kies je een andere agenda voor het lijstje.
+    // Via de schuifjesknop kies je een andere agenda voor het lijstje.
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
     expect(screen.getByText(/Agenda: Google Agenda/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
@@ -357,11 +357,11 @@ describe('AC31: datum weghalen met het kruisje', () => {
     const user = userEvent.setup()
     render(<App />)
     const box = await openDetails(user, 'APK')
-    await user.click(within(box).getByRole('button', { name: 'Datum weghalen' }))
+    await user.click(within(box).getByRole('button', { name: 'Datum en tijd weghalen' }))
     expect(within(box).getByLabelText('Datum')).toHaveValue('')
     expect(within(box).getByLabelText('Tijd')).toHaveValue('')
     expect(within(box).getByLabelText('Tijd')).toBeDisabled()
-    expect(within(box).getByRole('button', { name: 'Datum weghalen' })).toBeDisabled()
+    expect(within(box).getByRole('button', { name: 'Datum en tijd weghalen' })).toBeDisabled()
     expect(within(box).getByRole('button', { name: 'In agenda zetten' })).toBeDisabled()
     await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
     expect(screen.queryByText('vr 20 nov 08:00')).not.toBeInTheDocument()
@@ -508,30 +508,69 @@ describe('AC37: aantal en notitie', () => {
     const user = userEvent.setup()
     storeLists([list('a', 'AH', ['melk'])], 'a')
     render(<App />)
-    // Zonder Aantal blijft het aantal gewoon deel van de tekst.
+    // Zonder kenmerken blijft het aantal gewoon deel van de tekst en komt er geen vak.
     await typeItem(user, '2 pakken koffie')
     expect(itemTexts()).toEqual(['melk', '2 pakken koffie'])
+    expect(screen.queryByRole('region', { name: 'Nieuw item' })).not.toBeInTheDocument()
     await kenmerken(user, 'AH', ['Aantal', 'Notitie'])
-    await typeItem(user, '3 appels, 500 g gehakt, brood')
-    expect(itemTexts()).toEqual(['melk', '2 pakken koffie', 'appels', 'gehakt', 'brood'])
+
+    // Met kenmerken opent typen het vak Nieuw item, waarin je verder typt.
+    await user.type(screen.getByRole('textbox', { name: 'Item toevoegen' }), '3 appels')
+    let box = screen.getByRole('region', { name: 'Nieuw item' })
+    expect(within(box).getByLabelText('Tekst')).toHaveValue('3 appels')
+    expect(within(box).getByLabelText('Tekst')).toHaveFocus()
+    expect(screen.getByRole('textbox', { name: 'Item toevoegen' })).toHaveValue('')
+    await user.keyboard('{Enter}')
+    expect(screen.queryByRole('region', { name: 'Nieuw item' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Item toevoegen' })).toHaveFocus()
+
+    await user.type(screen.getByRole('textbox', { name: 'Item toevoegen' }), 'g')
+    box = screen.getByRole('region', { name: 'Nieuw item' })
+    await user.type(within(box).getByLabelText('Tekst'), 'ehakt')
+    await user.type(within(box).getByLabelText('Aantal'), '500 g')
+    await user.type(within(box).getByLabelText('Notitie'), 'half om half')
+    await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
+    expect(itemTexts()).toEqual(['melk', '2 pakken koffie', 'appels', 'gehakt'])
     const rows = screen.getByRole('list', { name: 'Items op AH' })
     expect(within(rows).getByText('3')).toHaveClass('item-aantal')
     expect(within(rows).getByText('500 g')).toHaveClass('item-aantal')
-    // Melk staat er al op: dan krijgt melk het aantal.
-    await typeItem(user, '2 melk')
-    expect(itemTexts()).toEqual(['melk', '2 pakken koffie', 'appels', 'gehakt', 'brood'])
-    expect(within(rows).getByText('2')).toHaveClass('item-aantal')
+    expect(within(rows).getByText('half om half')).toHaveClass('item-note')
 
-    const box = await openDetails(user, 'brood')
-    expect(within(box).getByLabelText('Aantal')).toHaveValue('')
+    // Staat het item er al op, dan blijft het vak open met de melding.
+    await user.type(screen.getByRole('textbox', { name: 'Item toevoegen' }), 'Melk{Enter}')
+    expect(screen.getByRole('status')).toHaveTextContent('Melk staat er al op.')
+    expect(screen.getByRole('region', { name: 'Nieuw item' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Annuleren' }))
+    expect(itemTexts()).toEqual(['melk', '2 pakken koffie', 'appels', 'gehakt'])
+
+    box = await openDetails(user, 'melk')
     await user.type(within(box).getByLabelText('Aantal'), '1')
     await user.type(within(box).getByLabelText('Notitie'), 'volkoren, gesneden')
     await user.clear(within(box).getByLabelText('Tekst'))
-    await user.type(within(box).getByLabelText('Tekst'), 'bruin brood')
+    await user.type(within(box).getByLabelText('Tekst'), 'halfvolle melk')
     await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
-    expect(itemTexts()).toEqual(['melk', '2 pakken koffie', 'appels', 'gehakt', 'bruin brood'])
+    expect(itemTexts()).toEqual(['halfvolle melk', '2 pakken koffie', 'appels', 'gehakt'])
     expect(screen.getByText('volkoren, gesneden')).toHaveClass('item-note')
-    expect(JSON.parse(localStorage.getItem(LISTS_KEY)!)[0].items[4].tekst).toBe('bruin brood')
+    expect(JSON.parse(localStorage.getItem(LISTS_KEY)!)[0].items[0].tekst).toBe('halfvolle melk')
+  })
+
+  it('een nieuw item met datum gaat met In agenda zetten meteen in de agenda', async () => {
+    const open = vi.fn()
+    vi.stubGlobal('open', open)
+    storeAfspraken({}, 'google')
+    const user = userEvent.setup()
+    render(<App />)
+    await user.type(screen.getByRole('textbox', { name: 'Item toevoegen' }), 'Kapper')
+    const box = screen.getByRole('region', { name: 'Nieuw item' })
+    // Datum en tijd op één regel.
+    const datum = within(box).getByLabelText('Datum')
+    expect(datum.parentElement).toBe(within(box).getByLabelText('Tijd').parentElement)
+    fireEvent.change(datum, { target: { value: '2026-11-10' } })
+    fireEvent.change(within(box).getByLabelText('Tijd'), { target: { value: '11:00' } })
+    await user.click(within(box).getByRole('button', { name: 'In agenda zetten' }))
+    expect(new URL(open.mock.calls[0][0]).searchParams.get('text')).toBe('Kapper')
+    expect(screen.getByText('di 10 nov 11:00')).toBeInTheDocument()
+    expect(await screen.findByLabelText('staat in je agenda')).toBeInTheDocument()
   })
 
   it('haalt een aantal uit de tekst, ook ingesproken getallen', () => {
