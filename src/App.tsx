@@ -44,15 +44,18 @@ export default function App() {
   // Het laatst geopende lijstje; `null` zolang er nog nooit een lijstje is geopend.
   const [huidig, setHuidig] = useState<string | null>(() => loadCurrent(lijstjes))
   // De app start met het laatst gebruikte lijstje, of met Mijn lijstjes als er nog geen is (F1).
-  const [screen, setScreen] = useState<'lijst' | 'lijstjes' | 'settings' | 'info'>(() => (huidig ? 'lijst' : 'lijstjes'))
+  const [screen, setScreen] = useState<'lijst' | 'lijstjes' | 'settings' | 'info'>(() =>
+    huidig ? 'lijst' : 'lijstjes',
+  )
   const [notice, setNotice] = useState<Notice | null>(null)
-  // Een lijstje dat vanuit dat lijstje zelf is weggegooid; Mijn lijstjes toont dan Ongedaan maken (F8, F12).
+  // Een lijstje dat op Mijn lijstjes is weggegooid; Mijn lijstjes toont dan Ongedaan maken (F12).
   const [justDeleted, setJustDeleted] = useState<Deleted | null>(null)
   const [speechEnabled, setSpeechEnabled] = useState(loadSpeechEnabled)
   const installPrompt = useInstallPrompt()
   const speech = useSpeech(
     // Op Mijn lijstjes is wat je zegt de naam van een nieuw lijstje (F31), op een lijstje zijn het items (F15).
-    (alternatives) => (screen === 'lijstjes' ? createSpoken(spokenName(alternatives)) : addTexts(bestSpoken(alternatives), true)),
+    (alternatives) =>
+      screen === 'lijstjes' ? createSpoken(spokenName(alternatives)) : addTexts(bestSpoken(alternatives), true),
     (text) => setNotice({ kind: 'error', text }),
   )
   const lijstje = lijstjes.find((l) => l.id === huidig) ?? lijstjes[0]
@@ -205,7 +208,8 @@ export default function App() {
       setNotice({ kind: 'error', text: 'Typ eerst wat het item is.' })
       return null
     }
-    const split = lijstje.kenmerken?.aantal && !details.aantal?.trim() ? splitAantal(t) : { tekst: t, aantal: details.aantal }
+    const split =
+      lijstje.kenmerken?.aantal && !details.aantal?.trim() ? splitAantal(t) : { tekst: t, aantal: details.aantal }
     const bestaand = lijstje.items.find((i) => sameText(i.tekst, split.tekst))
     if (bestaand) {
       setNotice({ kind: 'error', text: `${capitalize(bestaand.tekst)} staat er al op.` })
@@ -230,7 +234,11 @@ export default function App() {
       setNotice({ kind: 'error', text: problem })
       return false
     }
-    const aan: Kenmerken = Object.fromEntries(Object.entries(kenmerken).filter(([, v]) => v).map(([k]) => [k, true]))
+    const aan: Kenmerken = Object.fromEntries(
+      Object.entries(kenmerken)
+        .filter(([, v]) => v)
+        .map(([k]) => [k, true]),
+    )
     update(l.id, (x) => {
       const { kenmerken: _oud, ...rest } = x
       return { ...rest, naam: anders ? naam.trim() : x.naam, ...(Object.keys(aan).length > 0 && { kenmerken: aan }) }
@@ -283,7 +291,13 @@ export default function App() {
     // Niet wachten vóór het openen: anders houdt de browser het nieuwe venster tegen.
     // Zonder jaar: de eerstvolgende keer, en elk jaar terug (F44).
     const jaarlijks = heeftZonderJaar(l)
-    const afspraak = { id: itemId, titel, lijstje: l.naam, wanneer: jaarlijks ? volgendeKeer(wanneer) : wanneer, jaarlijks }
+    const afspraak = {
+      id: itemId,
+      titel,
+      lijstje: l.naam,
+      wanneer: jaarlijks ? volgendeKeer(wanneer) : wanneer,
+      jaarlijks,
+    }
     void zetInAgenda(welke, afspraak).then((ok) => {
       if (ok) {
         update(l.id, (x) => ({
@@ -293,7 +307,10 @@ export default function App() {
           ),
         }))
       } else if (welke === 'delen' && typeof navigator.share !== 'function') {
-        setNotice({ kind: 'error', text: 'Delen kan niet op deze telefoon. Kies een andere agenda met de schuifjesknop bovenaan het lijstje.' })
+        setNotice({
+          kind: 'error',
+          text: 'Delen kan niet op deze telefoon. Kies een andere agenda met de schuifjesknop bovenaan het lijstje.',
+        })
       }
     })
   }
@@ -340,15 +357,15 @@ export default function App() {
         notice={notice}
         onCloseNotice={() => setNotice(null)}
         reminders={reminders}
-      mic={{
-        show: speechEnabled && speechSupported(),
-        listening: speech.listening,
-        start: () => {
-          setNotice(null)
-          speech.start()
-        },
-        stop: speech.stop,
-      }}
+        mic={{
+          show: speechEnabled && speechSupported(),
+          listening: speech.listening,
+          start: () => {
+            setNotice(null)
+            speech.start()
+          },
+          stop: speech.stop,
+        }}
       />
     )
   }
@@ -361,7 +378,9 @@ export default function App() {
       notice={notice}
       onCloseNotice={() => setNotice(null)}
       onAdd={(text) => addTexts(splitTyped(text), false)}
-      onToggle={(id) => update(lijstje.id, (l) => ({ ...l, items: l.items.map((i) => (i.id === id ? { ...i, af: !i.af } : i)) }))}
+      onToggle={(id) =>
+        update(lijstje.id, (l) => ({ ...l, items: l.items.map((i) => (i.id === id ? { ...i, af: !i.af } : i)) }))
+      }
       onEdit={(id, text) => {
         const result = editItem(lijstje, id, text)
         update(lijstje.id, () => result.lijstje)
@@ -371,15 +390,6 @@ export default function App() {
       onRemove={(id) => update(lijstje.id, (l) => ({ ...l, items: l.items.filter((i) => i.id !== id) }))}
       onClear={(which) =>
         update(lijstje.id, (l) => ({ ...l, items: which === 'alles' ? [] : l.items.filter((i) => !i.af) }))
-      }
-      onDeleteList={
-        lijstjes.length > 1
-          ? () => {
-              setNotice(null)
-              setJustDeleted(remove(lijstje.id))
-              setScreen('lijstjes')
-            }
-          : null
       }
       onBack={() => {
         setNotice(null)

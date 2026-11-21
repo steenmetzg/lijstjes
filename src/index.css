@@ -10,7 +10,14 @@
   --accent: #1d4ed8;
   --accent-soft: #eff4ff;
 
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
   font-size: 16px;
   line-height: 1.4;
   color: var(--text);
@@ -50,7 +57,6 @@ button {
   padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
 }
 
-
 h1 {
   margin: 0;
   white-space: nowrap;
@@ -58,7 +64,6 @@ h1 {
   font-weight: 600;
   letter-spacing: -0.01em;
 }
-
 
 .header-actions {
   display: flex;
@@ -77,7 +82,6 @@ h1 {
   background: var(--surface);
   box-shadow: var(--shadow);
 }
-
 
 /* Aantal open items bij een lijstje op Mijn lijstjes (F9), zoals het label "vandaag" in WoonWerk. */
 .count {
@@ -110,7 +114,10 @@ h1 {
   background: var(--surface);
   box-shadow: var(--shadow);
   font-size: 0.75rem;
-  transition: background-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
 }
 
 .mode.selected {
@@ -208,7 +215,6 @@ h2 {
   color: #b42318;
 }
 
-
 .bottom {
   position: sticky;
   bottom: 0;
@@ -219,7 +225,6 @@ h2 {
   padding-bottom: max(16px, env(safe-area-inset-bottom));
   background: var(--bg);
 }
-
 
 .install {
   display: flex;
@@ -262,7 +267,6 @@ h2 {
   margin: 0;
   line-height: 1.45;
 }
-
 
 /* Versienummer onderaan de instellingen. */
 .version {
@@ -577,7 +581,9 @@ h2 {
   border-bottom: 1px solid var(--line);
   background: var(--bg);
   /* Bedekt ook de schaduw langs de zijkanten van het lijstje. */
-  box-shadow: -4px 0 0 var(--bg), 4px 0 0 var(--bg);
+  box-shadow:
+    -4px 0 0 var(--bg),
+    4px 0 0 var(--bg);
   transform: translateX(-50%);
 }
 
@@ -620,7 +626,9 @@ h2 {
   border: 2px solid #c4c9d2;
   border-radius: 50%;
   color: #ffffff;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 
 .item.done .check {
@@ -742,7 +750,9 @@ h2 {
 }
 
 .list-row.current.dragging {
-  box-shadow: inset 4px 0 0 var(--accent), 0 6px 18px rgba(16, 24, 40, 0.16);
+  box-shadow:
+    inset 4px 0 0 var(--accent),
+    0 6px 18px rgba(16, 24, 40, 0.16);
 }
 
 .list-row .item-edit input {
@@ -1317,4 +1327,28 @@ html.vak-open body {
   place-items: center;
   vertical-align: -3px;
   color: var(--accent);
+}
+
+/* Weggooi-knoppen op een lijstje: icoon met een rood kruisje rechtsonder. */
+.met-kruisje {
+  position: relative;
+}
+
+.kruisje {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #b42318;
+  border: 1.5px solid #fff;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+}
+
+.met-kruisje:disabled .kruisje {
+  background: #9aa0a6;
 }
