@@ -13,5 +13,5 @@
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
   '1.7.5':
-    'Een lijstje kan nu extra kenmerken hebben: Datum, Zonder jaar, Tijd, Notitie en Aantal. Zet ze aan met de knop [schuifjes] bovenaan het lijstje.',
+    'Je kan nu zelf bepalen welke informatie je wilt bijhouden in een Lijstje. Kies voor Datum, Tijd, Datum zonder jaar, Aantal en Notities.',
 }
