@@ -14,6 +14,7 @@ import {
   moveItem,
   newId,
   heeftTijd,
+  heeftZonderJaar,
   saveCurrent,
   saveLijstjes,
   capitalize,
@@ -27,7 +28,7 @@ import {
   type Kenmerken,
   type Lijstje,
 } from './lists'
-import { isAgenda, PER_ITEM, zetInAgenda, zichtbaar, type AgendaKeuze } from './agenda'
+import { isAgenda, PER_ITEM, volgendeKeer, zetInAgenda, zichtbaar, type AgendaKeuze } from './agenda'
 import Reminders from './Reminders'
 import { dueItems } from './reminders'
 import Settings from './Settings'
@@ -263,7 +264,10 @@ export default function App() {
     const titel = nieuweTitel ?? item?.tekst
     if (!itemId || !wanneer || !titel) return
     // Niet wachten vóór het openen: anders houdt de browser het nieuwe venster tegen.
-    void zetInAgenda(welke, { id: itemId, titel, lijstje: l.naam, wanneer }).then((ok) => {
+    // Zonder jaar: de eerstvolgende keer, en elk jaar terug (F44).
+    const jaarlijks = heeftZonderJaar(l)
+    const afspraak = { id: itemId, titel, lijstje: l.naam, wanneer: jaarlijks ? volgendeKeer(wanneer) : wanneer, jaarlijks }
+    void zetInAgenda(welke, afspraak).then((ok) => {
       if (ok) {
         update(l.id, (x) => ({
           ...x,
