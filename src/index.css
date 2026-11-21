@@ -513,7 +513,7 @@ h2 {
   min-width: 0;
   min-height: 40px;
   margin: 4px 0;
-  padding: 0 8px;
+  padding: 0 6px;
   font: inherit;
   color: inherit;
   background: var(--bg);
@@ -877,12 +877,13 @@ h2 {
 .details,
 .instellen {
   max-height: calc(100dvh - 90px);
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
 .field {
   display: grid;
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: 58px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   margin-top: 6px;
@@ -1199,7 +1200,7 @@ span.item-grip {
   flex: 1;
   min-width: 0;
   min-height: 40px;
-  padding: 0 8px;
+  padding: 0 6px;
   font: inherit;
   font-size: 1.25rem;
   font-weight: 600;
@@ -1223,4 +1224,31 @@ span.item-grip {
 .herinnering-switch:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Datum en tijd naast elkaar in het vak van een item (F33). */
+.date-field.met-tijd input {
+  width: 0;
+  padding: 0 6px;
+}
+
+.date-field.met-tijd input[type='date'] {
+  flex: 3;
+}
+
+.date-field.met-tijd input[type='time'] {
+  flex: 2;
+}
+
+.field input[type='date'],
+.field input[type='time'] {
+  cursor: pointer;
+}
+
+.field input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.date-field.met-tijd .date-clear {
+  width: 32px;
 }
