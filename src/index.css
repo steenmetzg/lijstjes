@@ -1227,22 +1227,69 @@ span.item-grip {
 }
 
 /* Datum en tijd naast elkaar in het vak van een item (F33). */
-.date-field.met-tijd input {
-  width: 0;
-  padding: 0 6px;
-}
-
-.date-field.met-tijd input[type='date'] {
+/* Een datum of tijd typen, met rechts in het veld een icoontje voor de kiezer (F33). */
+.moment-veld {
+  position: relative;
   flex: 3;
+  min-width: 0;
+  display: flex;
 }
 
-.date-field.met-tijd input[type='time'] {
-  flex: 2;
+.date-field.met-tijd .moment-veld + .moment-veld {
+  flex: none;
+  width: 62px;
 }
 
-.field input[type='date'],
-.field input[type='time'] {
-  cursor: pointer;
+.field .moment-veld input[type='text'] {
+  flex: 1;
+  width: 0;
+  padding: 0 30px 0 7px;
+  font-size: 0.95rem;
+}
+
+.field .moment-veld + .moment-veld input[type='text'] {
+  padding-right: 7px;
+  text-align: center;
+}
+
+.moment-open {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 100%;
+  border: none;
+  color: var(--accent);
+}
+
+.moment-open:disabled {
+  opacity: 0.35;
+}
+
+/* Het onzichtbare veld waar de kiezer van de telefoon bij hoort, onder het icoontje. */
+.field .moment-kiezer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 34px;
+  min-height: 0;
+  height: 1px;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Een vak open in de titelbalk: het lijstje erachter scrolt niet mee. */
+html.vak-open,
+html.vak-open body {
+  overflow: hidden;
+}
+
+.details,
+.instellen {
+  overscroll-behavior: contain;
 }
 
 .field input::-webkit-calendar-picker-indicator {

@@ -267,3 +267,49 @@ export async function zetInAgenda(agenda: Agenda, a: Afspraak): Promise<boolean>
     }
   }
 }
+
+/** "2026-11-25" als "25-11-2026", zoals je een datum typt (F33). */
+export function datumTekst(datum: string): string {
+  const [y, m, d] = datum.split('-')
+  return `${d}-${m}-${y}`
+}
+
+/**
+ * Een getypte datum als "2026-11-25" (F33): dag-maand-jaar met -, /, . of een spatie ertussen ("25-11-2026",
+ * "25/11/26", "25 11"), of alleen cijfers ("25112026", "2511"). Zonder jaar het huidige jaar. Leeg geeft "",
+ * een onbekende datum `null`.
+ */
+export function leesDatum(tekst: string, now: Date = new Date()): string | null {
+  const t = tekst.trim()
+  if (!t) return ''
+  let d: string, m: string, y: string | undefined
+  const delen = t.split(/[-/.\s]+/)
+  if (delen.length >= 2 && delen.length <= 3 && delen.every((x) => /^\d+$/.test(x))) {
+    ;[d, m, y] = delen
+  } else if (/^\d{4}(\d{2}|\d{4})?$/.test(t)) {
+    d = t.slice(0, 2)
+    m = t.slice(2, 4)
+    y = t.length > 4 ? t.slice(4) : undefined
+  } else return null
+  let jaar = y === undefined ? now.getFullYear() : Number(y)
+  if (y !== undefined && y.length <= 2) jaar += 2000
+  if (y !== undefined && y.length !== 2 && y.length !== 4) return null
+  const datum = `${jaar}-${pad(Number(m))}-${pad(Number(d))}`
+  return isMoment(datum) ? datum : null
+}
+
+/** Een getypte tijd als "09:30" (F33): "9:30", "9.30", "930", "0930" of "9". Leeg geeft "", onbekend `null`. */
+export function leesTijd(tekst: string): string | null {
+  const t = tekst.trim()
+  if (!t) return ''
+  let h: number, min: number
+  const m = /^(\d{1,2})(?:[:.\s](\d{2}))?$/.exec(t)
+  if (m) {
+    h = Number(m[1])
+    min = m[2] ? Number(m[2]) : 0
+  } else if (/^\d{3,4}$/.test(t)) {
+    h = Number(t.slice(0, t.length - 2))
+    min = Number(t.slice(-2))
+  } else return null
+  return h < 24 && min < 60 ? `${pad(h)}:${pad(min)}` : null
+}
