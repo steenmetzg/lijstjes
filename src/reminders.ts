@@ -1,8 +1,8 @@
 // Herinneringen in de app (F36): bij het openen van de app een melding met de items die vandaag zijn of waarvan
 // de datum voorbij is. Alleen de dag telt, niet de tijd.
 
-import { toDate } from './agenda'
-import type { Item, Lijstje } from './lists'
+import { dagSleutel, zichtbaar } from './agenda'
+import { heeftDatum, heeftTijd, type Item, type Lijstje } from './lists'
 
 export interface Due {
   lijstjeId: string
@@ -12,21 +12,22 @@ export interface Due {
   voorbij: boolean
 }
 
-function dayKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-/** Open (niet afgevinkte) items van herinneringslijstjes met een datum van vandaag of eerder, de oudste eerst. */
+/**
+ * Open (niet afgevinkte) items van lijstjes met het kenmerk Datum met een datum van vandaag of eerder, de oudste
+ * eerst. `wanneer` is de datum zoals je hem ziet: zonder tijd als het kenmerk Tijd uit staat.
+ */
 export function dueItems(lijstjes: readonly Lijstje[], now: Date = new Date()): Due[] {
-  const today = dayKey(now)
+  const today = dagSleutel(now)
   const result: Due[] = []
   for (const l of lijstjes) {
-    if (!l.herinnering) continue
+    if (!heeftDatum(l)) continue
+    const tijd = heeftTijd(l)
     for (const item of l.items) {
       if (item.af || !item.wanneer) continue
-      const day = dayKey(toDate(item.wanneer))
+      const day = item.wanneer.slice(0, 10)
       if (day > today) continue
-      result.push({ lijstjeId: l.id, lijstjeNaam: l.naam, item: item as Due['item'], voorbij: day < today })
+      const wanneer = zichtbaar(item.wanneer, tijd)
+      result.push({ lijstjeId: l.id, lijstjeNaam: l.naam, item: { ...item, wanneer }, voorbij: day < today })
     }
   }
   return result.sort((a, b) => a.item.wanneer.localeCompare(b.item.wanneer))

@@ -1,7 +1,22 @@
 import { useRef, useState, type FormEvent, type ReactNode, type TouchEvent } from 'react'
-import { ArrowLeft, Bell, BellOff, CalendarCheck, CalendarDays, CalendarPlus, Check, GripVertical, Mic, Pencil, Trash2, X } from 'lucide-react'
-import { AGENDAS, formatWanneer, isVoorbij, opDatum, PER_ITEM, type AgendaKeuze } from './agenda'
-import { limitTyped, MAX_NAAM, MAX_TEKST, type Item, type Lijstje } from './lists'
+import { ArrowLeft, CalendarCheck, CalendarDays, Check, Clock, GripVertical, Mic, Pencil, Trash2, X } from 'lucide-react'
+import { AGENDAS, agendaLabel, formatWanneer, isVoorbij, opDatum, PER_ITEM, zichtbaar, type AgendaKeuze } from './agenda'
+import {
+  heeftDatum,
+  heeftKenmerken,
+  heeftTijd,
+  KENMERKEN,
+  limitTyped,
+  MAX_AANTAL,
+  MAX_NAAM,
+  MAX_NOTITIE,
+  MAX_TEKST,
+  staatInAgenda,
+  type Details,
+  type Item,
+  type Kenmerken,
+  type Lijstje,
+} from './lists'
 import { MoreAbove, MoreBelow } from './MoreItems'
 import { useScrollList, type Grip } from './scrollList'
 
@@ -27,16 +42,16 @@ interface Props {
   onDeleteList: (() => void) | null
   onBack: () => void
   mic: { show: boolean; listening: boolean; start: () => void; stop: () => void }
-  /** Herinneringslijstje: datum en tijd van een item wijzigen, of weghalen met `null` (F33). */
-  onWhen: (id: string, wanneer: string | null) => void
-  /** Herinneringslijstje: de agenda van het lijstje kiezen en, met een item, dat item erin zetten (F34). */
+  /** Tekst en kenmerken van een item bewaren uit het vak met de kenmerken (F42). */
+  onDetails: (id: string, tekst: string, details: Details) => void
+  /**
+   * De agenda van het lijstje kiezen en, met een item, dat item erin zetten met de datum (en tijd) die je ziet (F34).
+   */
   onAgenda: (agenda: AgendaKeuze | null, itemId: string | null, wanneer?: string) => void
-  /** Van een gewoon lijstje een herinneringslijstje maken, of de herinnering uitzetten (F38). */
-  onHerinnering: (aan: boolean) => void
   /** De melding met herinneringen (F36). */
   reminders?: ReactNode
-  /** Nieuwe naam voor het lijstje; `false` als die niet kan (de melding staat dan onderaan) (F37). */
-  onRename: (naam: string) => boolean
+  /** Nieuwe naam en kenmerken voor het lijstje; `false` als de naam niet kan (de melding staat dan onderaan) (F37, F41). */
+  onInstellen: (naam: string, kenmerken: Kenmerken) => boolean
 }
 
 interface RowProps {
@@ -48,23 +63,27 @@ interface RowProps {
   onEdit: (text: string) => void
   onRemove: () => void
   grip: Grip
-  /** In een herinneringslijstje: datum en tijd onder de tekst en een agenda-knopje (F33, F34). */
-  herinnering: boolean
-  /** Opent het vak met datum en tijd (F33). */
-  onDate: () => void
+  /** Op datum gesorteerd: geen greep om te verplaatsen (F33). */
+  opDatum: boolean
+  /** De kenmerken die aan staan (Tijd alleen samen met Datum). */
+  kenmerken: Required<Kenmerken>
+  /** Opent het vak met de kenmerken (F42); zonder kenmerken pas je de tekst in de regel zelf aan (F27). */
+  onOpen: (() => void) | null
 }
 
 /**
- * Eén item: vastpakken om te verplaatsen (F28), het rondje om af te vinken (F6), de tekst om aan te passen (F27),
- * het kruisje of naar links vegen om weg te gooien (F7).
+ * Eén item: vastpakken om te verplaatsen (F28), het rondje om af te vinken (F6), de tekst om aan te passen (F27,
+ * F42), het kruisje of naar links vegen om weg te gooien (F7). Met kenmerken ook het aantal, de datum en de notitie.
  */
-function ItemRow({ item, shift, dragging, onToggle, onEdit, onRemove, grip, herinnering, onDate }: RowProps) {
-  // Staat het item met deze datum en tijd in de agenda (F34)?
-  const inAgenda = Boolean(item.wanneer && item.inAgenda === item.wanneer)
+function ItemRow({ item, shift, dragging, onToggle, onEdit, onRemove, grip, opDatum: gesorteerd, kenmerken, onOpen }: RowProps) {
   const [dx, setDx] = useState(0)
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState(item.tekst)
   const touch = useRef<{ x: number; y: number; dir: 'h' | 'v' | null } | null>(null)
+  const wanneer = kenmerken.datum && item.wanneer ? zichtbaar(item.wanneer, kenmerken.tijd) : undefined
+  const inAgenda = kenmerken.datum && staatInAgenda(item, kenmerken.tijd)
+  const aantal = kenmerken.aantal ? item.aantal : undefined
+  const notitie = kenmerken.notitie ? item.notitie : undefined
 
   function onTouchStart(e: TouchEvent) {
     if (editing) return
@@ -125,8 +144,8 @@ function ItemRow({ item, shift, dragging, onToggle, onEdit, onRemove, grip, heri
         setDx(0)
       }}
     >
-      {herinnering ? (
-        // Een herinneringslijstje staat op datum; verplaatsen kan daar niet (F33).
+      {gesorteerd ? (
+        // Op datum gesorteerd; verplaatsen kan dan niet (F33).
         <span className="item-grip" aria-hidden />
       ) : (
         <button
@@ -166,35 +185,21 @@ function ItemRow({ item, shift, dragging, onToggle, onEdit, onRemove, grip, heri
             />
           </form>
         ) : (
-          <button type="button" className="item-text" aria-label={`${item.tekst} aanpassen`} onClick={startEditing}>
-            {item.tekst}
+          <button type="button" className="item-text" aria-label={`${item.tekst} aanpassen`} onClick={onOpen ?? startEditing}>
+            <span className="item-line">
+              {aantal && <span className="item-aantal">{aantal}</span>}
+              <span className="item-tekst">{item.tekst}</span>
+            </span>
+            {wanneer && (
+              <span className={isVoorbij(wanneer) ? 'item-when past' : 'item-when'}>
+                {formatWanneer(wanneer)}
+                {inAgenda && <CalendarCheck className="item-in-agenda" size={14} strokeWidth={2} aria-label="staat in je agenda" />}
+              </span>
+            )}
+            {notitie && <span className="item-note">{notitie}</span>}
           </button>
         )}
-        {herinnering &&
-          // Alleen tonen; wijzigen gaat via het agenda-knopje (F33). Rechts op deze regel is ruimte gelaten voor een
-          // microfoon, om later datum en tijd in te spreken.
-          (item.wanneer ? (
-            <span className={isVoorbij(item.wanneer) ? 'item-when past' : 'item-when'}>{formatWanneer(item.wanneer)}</span>
-          ) : (
-            <span className="item-when none">Geen datum</span>
-          ))}
       </div>
-      {herinnering && (
-        <button
-          type="button"
-          className={inAgenda ? 'item-delete item-agenda placed' : 'item-delete item-agenda'}
-          aria-label={inAgenda ? `${item.tekst} staat in je agenda; datum wijzigen` : `${item.tekst} in agenda zetten`}
-          // Altijd eerst het vak met datum en tijd; van daaruit in de agenda (F34). Afgevinkt: niet meer nodig.
-          disabled={item.af}
-          onClick={onDate}
-        >
-          {inAgenda ? (
-            <CalendarCheck size={18} strokeWidth={1.75} aria-hidden />
-          ) : (
-            <CalendarPlus size={18} strokeWidth={1.75} aria-hidden />
-          )}
-        </button>
-      )}
       <button type="button" className="item-delete" aria-label={`${item.tekst} weggooien`} onClick={onRemove}>
         <X size={18} strokeWidth={1.75} aria-hidden />
       </button>
@@ -202,7 +207,27 @@ function ItemRow({ item, shift, dragging, onToggle, onEdit, onRemove, grip, heri
   )
 }
 
-/** Het scherm van één lijstje (F1 t/m F8, F15, F27, F28). */
+/** Het vak met de kenmerken van een item: wat er in de velden staat. */
+interface Detail {
+  id: string
+  tekst: string
+  datum: string
+  tijd: string
+  notitie: string
+  aantal: string
+}
+
+/** Opent de kiezer van de telefoon; Android toont in het veld zelf alleen een pijltje (F33). */
+function openPicker(input: HTMLInputElement | null) {
+  if (!input) return
+  try {
+    input.showPicker()
+  } catch {
+    input.focus()
+  }
+}
+
+/** Het scherm van één lijstje (F1 t/m F8, F15, F27, F28, F41, F42). */
 export default function ListView({
   lijstje,
   notice,
@@ -216,28 +241,36 @@ export default function ListView({
   onDeleteList,
   onBack,
   mic,
-  onWhen,
+  onDetails,
   onAgenda,
   reminders,
-  onRename,
-  onHerinnering,
+  onInstellen,
 }: Props) {
   const [text, setText] = useState('')
   const [clearing, setClearing] = useState(false)
-  // De naam van het lijstje aanpassen door op de titel te tikken (F37).
-  const [naam, setNaam] = useState<string | null>(null)
-  // De keuze van de agenda: `voor` is het item dat daarna in de agenda gaat, of `null` bij het belletje (F34).
-  const [choosing, setChoosing] = useState<{ voor: string | null } | null>(null)
-  // Het vak met datum en tijd van een item (F33): het item en de datum in het veld.
-  const [dating, setDating] = useState<{ id: string; waarde: string } | null>(null)
-  const datingItem = dating ? lijstje.items.find((i) => i.id === dating.id) : undefined
+  // Naam en kenmerken van het lijstje, via de titel met het potloodje (F37, F41).
+  const [instellen, setInstellen] = useState<{ naam: string; kenmerken: Kenmerken } | null>(null)
+  // De keuze van de agenda: `voor` is het item dat daarna in de agenda gaat (met `wanneer`), of `null` (F34).
+  const [choosing, setChoosing] = useState<{ voor: string | null; wanneer?: string } | null>(null)
+  // Het vak met de kenmerken van een item (F42).
+  const [detail, setDetail] = useState<Detail | null>(null)
+  const detailItem = detail ? lijstje.items.find((i) => i.id === detail.id) : undefined
   const dateInput = useRef<HTMLInputElement>(null)
-  const herinnering = lijstje.herinnering === true
-  // Een herinneringslijstje staat op datum (F33).
-  const items = herinnering ? opDatum(lijstje.items) : lijstje.items
+  const timeInput = useRef<HTMLInputElement>(null)
+  const datum = heeftDatum(lijstje)
+  const tijd = heeftTijd(lijstje)
+  const kenmerken: Required<Kenmerken> = {
+    datum,
+    tijd,
+    notitie: lijstje.kenmerken?.notitie === true,
+    aantal: lijstje.kenmerken?.aantal === true,
+  }
+  const metKenmerken = heeftKenmerken(lijstje)
+  // Met Datum staat een lijstje op datum (F33).
+  const items = datum ? opDatum(lijstje.items) : lijstje.items
   const hasDone = items.some((i) => i.af)
   const input = useRef<HTMLInputElement>(null)
-  const scroll = useScrollList(items, herinnering ? () => {} : onMove)
+  const scroll = useScrollList(items, datum ? () => {} : onMove)
   const { header, list, addRow, bottom, hidden } = scroll
 
   function submit(e: FormEvent) {
@@ -253,30 +286,57 @@ export default function ListView({
     setClearing(false)
   }
 
-  function openDate(item: Item) {
+  /** Sluit de open keuzes in de titelbalk; er staat er steeds hoogstens één open. */
+  function closeAll() {
     setClearing(false)
     setChoosing(null)
-    setDating({ id: item.id, waarde: item.wanneer ?? '' })
+    setDetail(null)
+    setInstellen(null)
   }
 
-  /** Bewaart de datum uit het vak en zet het item zo nodig meteen in de agenda (F33, F34). */
-  function saveDate(enAgenda: boolean) {
-    if (!dating) return
-    const { id, waarde } = dating
-    setDating(null)
-    onWhen(id, waarde || null)
-    if (enAgenda && waarde) {
+  function openDetail(item: Item) {
+    closeAll()
+    const w = item.wanneer ?? ''
+    setDetail({
+      id: item.id,
+      tekst: item.tekst,
+      datum: w.slice(0, 10),
+      tijd: w.slice(11, 16),
+      notitie: item.notitie ?? '',
+      aantal: item.aantal ?? '',
+    })
+  }
+
+  /** De datum en tijd uit het vak; met Tijd uit blijft een eerder ingevulde tijd bewaard (F41, F42). */
+  function detailWanneer(d: Detail): string | undefined {
+    if (!d.datum) return undefined
+    const t = tijd ? d.tijd : (detailItem?.wanneer?.slice(11, 16) ?? '')
+    return t ? `${d.datum}T${t}` : d.datum
+  }
+
+  /** Bewaart het vak met de kenmerken en zet het item zo nodig meteen in de agenda (F34, F42). */
+  function saveDetail(enAgenda: boolean) {
+    if (!detail) return
+    const wanneer = detailWanneer(detail)
+    setDetail(null)
+    onDetails(detail.id, detail.tekst, { wanneer, notitie: detail.notitie, aantal: detail.aantal })
+    if (enAgenda && wanneer) {
+      const zien = zichtbaar(wanneer, tijd)
       // Een vaste agenda: meteen erin; nog niets gekozen of Per item kiezen: eerst vragen welke (F34).
-      if (lijstje.agenda && lijstje.agenda !== PER_ITEM) onAgenda(lijstje.agenda, id, waarde)
-      else setChoosing({ voor: id })
+      if (lijstje.agenda && lijstje.agenda !== PER_ITEM) onAgenda(lijstje.agenda, detail.id, zien)
+      else setChoosing({ voor: detail.id, wanneer: zien })
     }
   }
 
   function choose(agenda: AgendaKeuze) {
     const voor = choosing?.voor ?? null
+    const wanneer = choosing?.wanneer
     setChoosing(null)
-    onAgenda(agenda, voor)
+    onAgenda(agenda, voor, wanneer)
   }
+
+  const detailZien = detail ? detailWanneer(detail) : undefined
+  const detailInAgenda = detailItem?.inAgenda && detailZien && zichtbaar(detailZien, tijd) === detailItem.inAgenda
 
   return (
     <main className="app list-screen">
@@ -284,79 +344,23 @@ export default function ListView({
         <button type="button" className="back-button" aria-label="Terug naar Mijn lijstjes" onClick={onBack}>
           <ArrowLeft size={20} strokeWidth={1.75} aria-hidden />
         </button>
-        {naam === null ? (
-          <h1>
-            <button
-              type="button"
-              className="title-button"
-              aria-label={`Naam van ${lijstje.naam} wijzigen`}
-              onClick={() => setNaam(lijstje.naam)}
-            >
-              <span className="title-text">{lijstje.naam}</span>
-              <Pencil className="title-pencil" size={15} strokeWidth={1.75} aria-hidden />
-            </button>
-          </h1>
-        ) : (
-          <form
-            className="title-edit"
-            onSubmit={(e) => {
-              e.preventDefault()
-              // Enter: een goede naam bewaren; anders blijft het veld open met de melding onderaan (F37).
-              if (naam.trim() === lijstje.naam || onRename(naam)) setNaam(null)
+        <h1>
+          <button
+            type="button"
+            className="title-button"
+            aria-label={`Naam en kenmerken van ${lijstje.naam}`}
+            aria-expanded={instellen !== null}
+            onClick={() => {
+              const open = instellen !== null
+              closeAll()
+              if (!open) setInstellen({ naam: lijstje.naam, kenmerken: { ...kenmerken, tijd: lijstje.kenmerken?.tijd === true } })
             }}
           >
-            <input
-              type="text"
-              aria-label={`Nieuwe naam voor ${lijstje.naam}`}
-              enterKeyHint="done"
-              autoComplete="off"
-              autoFocus
-              maxLength={MAX_NAAM}
-              value={naam}
-              onChange={(e) => setNaam(e.target.value.slice(0, MAX_NAAM))}
-              onBlur={() => {
-                // Ergens anders tikken: een goede naam wordt bewaard, anders blijft de oude naam staan.
-                if (naam.trim() !== lijstje.naam) onRename(naam)
-                setNaam(null)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') setNaam(null)
-              }}
-            />
-          </form>
-        )}
+            <span className="title-text">{lijstje.naam}</span>
+            <Pencil className="title-pencil" size={15} strokeWidth={1.75} aria-hidden />
+          </button>
+        </h1>
         <div className="header-actions">
-          {herinnering ? (
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Agenda van dit lijstje"
-              aria-expanded={choosing !== null}
-              onClick={() => {
-                setClearing(false)
-                setDating(null)
-                setChoosing(choosing ? null : { voor: null })
-              }}
-            >
-              <Bell size={20} strokeWidth={1.75} aria-hidden />
-            </button>
-          ) : (
-            // Een gewoon lijstje: met de doorgestreepte bel wordt het een herinneringslijstje (F38).
-            <button
-              type="button"
-              className="icon-button bell-off"
-              aria-label="Herinneringslijstje maken"
-              onClick={() => {
-                setClearing(false)
-                setDating(null)
-                onHerinnering(true)
-                // Meteen de agenda-keuze, met het schuifje om het weer uit te zetten (F38).
-                setChoosing({ voor: null })
-              }}
-            >
-              <BellOff size={20} strokeWidth={1.75} aria-hidden />
-            </button>
-          )}
           <button
             type="button"
             className="icon-button"
@@ -364,15 +368,15 @@ export default function ListView({
             aria-expanded={clearing}
             disabled={items.length === 0 && !onDeleteList}
             onClick={() => {
-              setChoosing(null)
-              setDating(null)
-              setClearing(!clearing)
+              const open = clearing
+              closeAll()
+              setClearing(!open)
             }}
           >
             <Trash2 size={20} strokeWidth={1.75} aria-hidden />
           </button>
         </div>
-        {/* De keuze staat in de vaste titelbalk, zodat hij ook in beeld komt als je omlaag gescrold bent (F8). */}
+        {/* De keuzes staan in de vaste titelbalk, zodat ze ook in beeld komen als je omlaag gescrold bent (F8). */}
         {clearing && (
           <section className="confirm clear-choice" aria-label="Lijstje weggooien">
             <strong>Lijstje {lijstje.naam} weggooien</strong>
@@ -392,89 +396,216 @@ export default function ListView({
             </div>
           </section>
         )}
-        {dating && datingItem && (
-          <section className="confirm clear-choice date-choice" aria-label="Datum en tijd">
-            <strong>{datingItem.tekst}</strong>
-            {datingItem.inAgenda && datingItem.inAgenda === datingItem.wanneer && (
-              <p>Staat al in je agenda op {formatWanneer(datingItem.inAgenda)}.</p>
-            )}
-            <div className="date-field">
-              <input
-                ref={dateInput}
-                type="datetime-local"
-                aria-label={`Datum en tijd van ${datingItem.tekst}`}
-                value={dating.waarde}
-                onChange={(e) => setDating({ ...dating, waarde: e.target.value })}
-              />
-              <button
-                type="button"
-                className="date-clear date-open"
-                aria-label="Datum en tijd kiezen"
-                onClick={() => {
-                  // De kiezer van de telefoon; Android toont in het veld zelf alleen een pijltje (F33).
-                  const input = dateInput.current
-                  if (!input) return
-                  try {
-                    input.showPicker()
-                  } catch {
-                    input.focus()
-                  }
-                }}
-              >
-                <CalendarDays size={18} strokeWidth={1.75} aria-hidden />
-              </button>
-              <button
-                type="button"
-                className="date-clear"
-                aria-label="Datum weghalen"
-                disabled={!dating.waarde}
-                onClick={() => setDating({ ...dating, waarde: '' })}
-              >
-                <X size={18} strokeWidth={1.75} aria-hidden />
-              </button>
-            </div>
-            <div className="confirm-buttons">
-              <button type="button" disabled={dating.waarde === (datingItem.wanneer ?? '')} onClick={() => saveDate(false)}>
-                Alleen in Lijstjes bewaren
-              </button>
-              <button
-                type="button"
-                className="confirm-yes"
-                // Met dezelfde datum en tijd zou er een tweede agenda-item komen (F34).
-                disabled={!dating.waarde || dating.waarde === datingItem.inAgenda}
-                onClick={() => saveDate(true)}
-              >
-                In agenda zetten
-              </button>
-              <button type="button" className="cancel" onClick={() => setDating(null)}>
-                Annuleren
-              </button>
-            </div>
+        {instellen && (
+          <section className="confirm clear-choice instellen" aria-label="Lijstje aanpassen">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                // Een goede naam: bewaren en sluiten; anders blijft het vak open met de melding onderaan (F37).
+                if (onInstellen(instellen.naam, instellen.kenmerken)) setInstellen(null)
+              }}
+            >
+              <label className="field">
+                <span>Naam</span>
+                <input
+                  type="text"
+                  aria-label="Naam van het lijstje"
+                  enterKeyHint="done"
+                  autoComplete="off"
+                  maxLength={MAX_NAAM}
+                  value={instellen.naam}
+                  onChange={(e) => setInstellen({ ...instellen, naam: e.target.value.slice(0, MAX_NAAM) })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setInstellen(null)
+                  }}
+                />
+              </label>
+              <p className="instellen-uitleg">Extra kenmerken per item</p>
+              <div className="kenmerken">
+                {KENMERKEN.map((k) => {
+                  // Tijd hoort bij een datum: zonder Datum is Tijd uit en niet te kiezen (F41).
+                  const uit = k.id === 'tijd' && !instellen.kenmerken.datum
+                  return (
+                    <label key={k.id} className={uit ? 'kenmerk off' : 'kenmerk'}>
+                      <span>{k.label}</span>
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        className="herinnering-switch"
+                        aria-label={k.label}
+                        checked={!uit && instellen.kenmerken[k.id] === true}
+                        disabled={uit}
+                        onChange={(e) =>
+                          setInstellen({ ...instellen, kenmerken: { ...instellen.kenmerken, [k.id]: e.target.checked } })
+                        }
+                      />
+                    </label>
+                  )
+                })}
+              </div>
+              {instellen.kenmerken.datum && lijstje.agenda && (
+                <p className="instellen-agenda">
+                  Agenda: {lijstje.agenda === PER_ITEM ? 'per item kiezen' : agendaLabel(lijstje.agenda)}{' '}
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => {
+                      setInstellen(null)
+                      setChoosing({ voor: null })
+                    }}
+                  >
+                    Wijzigen
+                  </button>
+                </p>
+              )}
+              <div className="confirm-buttons">
+                <button type="button" className="cancel-half" onClick={() => setInstellen(null)}>
+                  Annuleren
+                </button>
+                <button type="submit" className="confirm-yes">
+                  Bewaren
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
+        {detail && detailItem && (
+          <section className="confirm clear-choice details" aria-label={`Details van ${detailItem.tekst}`}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                saveDetail(false)
+              }}
+            >
+              <label className="field">
+                <span>Item</span>
+                <input
+                  type="text"
+                  aria-label="Tekst"
+                  enterKeyHint="done"
+                  autoComplete="off"
+                  maxLength={MAX_TEKST}
+                  value={detail.tekst}
+                  onChange={(e) => setDetail({ ...detail, tekst: e.target.value.slice(0, MAX_TEKST) })}
+                />
+              </label>
+              {kenmerken.aantal && (
+                <label className="field">
+                  <span>Aantal</span>
+                  <input
+                    type="text"
+                    aria-label="Aantal"
+                    placeholder="bijv. 2 of 500 g"
+                    enterKeyHint="done"
+                    autoComplete="off"
+                    maxLength={MAX_AANTAL}
+                    value={detail.aantal}
+                    onChange={(e) => setDetail({ ...detail, aantal: e.target.value.slice(0, MAX_AANTAL) })}
+                  />
+                </label>
+              )}
+              {datum && (
+                <div className="field">
+                  <span>Datum</span>
+                  <div className="date-field">
+                    <input
+                      ref={dateInput}
+                      type="date"
+                      aria-label="Datum"
+                      value={detail.datum}
+                      onChange={(e) => setDetail({ ...detail, datum: e.target.value })}
+                    />
+                    <button type="button" className="date-clear date-open" aria-label="Datum kiezen" onClick={() => openPicker(dateInput.current)}>
+                      <CalendarDays size={18} strokeWidth={1.75} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      className="date-clear"
+                      aria-label="Datum weghalen"
+                      disabled={!detail.datum}
+                      onClick={() => setDetail({ ...detail, datum: '', tijd: '' })}
+                    >
+                      <X size={18} strokeWidth={1.75} aria-hidden />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {tijd && (
+                <div className="field">
+                  <span>Tijd</span>
+                  <div className="date-field">
+                    <input
+                      ref={timeInput}
+                      type="time"
+                      aria-label="Tijd"
+                      // Een tijd hoort bij een datum (F41).
+                      disabled={!detail.datum}
+                      value={detail.tijd}
+                      onChange={(e) => setDetail({ ...detail, tijd: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      className="date-clear date-open"
+                      aria-label="Tijd kiezen"
+                      disabled={!detail.datum}
+                      onClick={() => openPicker(timeInput.current)}
+                    >
+                      <Clock size={18} strokeWidth={1.75} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      className="date-clear"
+                      aria-label="Tijd weghalen"
+                      disabled={!detail.tijd}
+                      onClick={() => setDetail({ ...detail, tijd: '' })}
+                    >
+                      <X size={18} strokeWidth={1.75} aria-hidden />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {kenmerken.notitie && (
+                <label className="field">
+                  <span>Notitie</span>
+                  <textarea
+                    aria-label="Notitie"
+                    rows={3}
+                    maxLength={MAX_NOTITIE}
+                    value={detail.notitie}
+                    onChange={(e) => setDetail({ ...detail, notitie: e.target.value.slice(0, MAX_NOTITIE) })}
+                  />
+                </label>
+              )}
+              {detailInAgenda && detailItem.inAgenda && <p>Staat al in je agenda op {formatWanneer(detailItem.inAgenda)}.</p>}
+              <div className="confirm-buttons">
+                {datum && (
+                  <button
+                    type="button"
+                    className="wide"
+                    // Zonder datum kan het niet; met dezelfde datum zou er een tweede agenda-item komen (F34).
+                    disabled={!detail.datum || Boolean(detailInAgenda)}
+                    onClick={() => saveDetail(true)}
+                  >
+                    In agenda zetten
+                  </button>
+                )}
+                <button type="button" className="cancel-half" onClick={() => setDetail(null)}>
+                  Annuleren
+                </button>
+                <button type="submit" className="confirm-yes">
+                  Bewaren
+                </button>
+              </div>
+            </form>
           </section>
         )}
         {choosing && (
           <section className="confirm clear-choice agenda-choice" aria-label="Agenda kiezen">
-            <div className="agenda-choice-head">
-              <strong>{choosing.voor ? 'In welke agenda?' : `Herinneringen voor ${lijstje.naam}`}</strong>
-              {!choosing.voor && (
-                // Het schuifje rechts naast de titel: uitzetten maakt er weer een gewoon lijstje van (F38).
-                <input
-                  type="checkbox"
-                  role="switch"
-                  className="herinnering-switch"
-                  aria-label="Herinnering"
-                  checked
-                  onChange={() => {
-                    setChoosing(null)
-                    onHerinnering(false)
-                  }}
-                />
-              )}
-            </div>
+            <strong>{choosing.voor ? 'In welke agenda?' : `Agenda voor ${lijstje.naam}`}</strong>
             <p>
               {choosing.voor && lijstje.agenda === PER_ITEM
                 ? 'Kies waar je dit item ook op wilt nemen.'
-                : `Herinneringen worden altijd in Lijstjes getoond. Kies hieronder waar je ze ook op wilt nemen. Je keuze geldt alleen voor dit lijstje (${lijstje.naam}).`}
+                : `Datums worden altijd in Lijstjes getoond. Kies hieronder waar je ze ook op wilt nemen. Je keuze geldt alleen voor dit lijstje (${lijstje.naam}).`}
             </p>
             <div className="confirm-buttons">
               {AGENDAS.map((a) => (
@@ -532,8 +663,9 @@ export default function ListView({
             onEdit={(t) => onEdit(item.id, t)}
             onRemove={() => onRemove(item.id)}
             grip={scroll.gripFor(item.id, index)}
-            herinnering={herinnering}
-            onDate={() => openDate(item)}
+            opDatum={datum}
+            kenmerken={kenmerken}
+            onOpen={metKenmerken ? () => openDetail(item) : null}
           />
         ))}
         {/* De invoerregel staat als laatste regel in het lijstje (F3, F15). */}

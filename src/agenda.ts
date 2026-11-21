@@ -1,4 +1,4 @@
-// Herinneringen (F32 t/m F35): datum en tijd van een item tonen, en een item in je agenda zetten.
+// Kenmerk Datum en Tijd (F33 t/m F35): datum en tijd van een item tonen, en een item in je agenda zetten.
 // Lijstjes zelf stuurt geen meldingen; de herinnering komt van je agenda.
 
 /** De agenda's waar een herinneringslijstje zijn items in kan zetten (F34). */
@@ -38,36 +38,73 @@ export const DUUR_MINUTEN = 30
 /** Datum en tijd zoals het datumveld ze geeft: "2026-11-08T14:00" (lokale tijd). */
 const WANNEER = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
 
+/** Alleen een datum: "2026-11-08" (kenmerk Datum zonder Tijd, F41). */
+const DATUM = /^\d{4}-\d{2}-\d{2}$/
+
+/** Datum met tijd, zoals versie 1.4 t/m 1.6 die kennen. */
 export function isWanneer(value: unknown): value is string {
-  return typeof value === 'string' && WANNEER.test(value) && !isNaN(toDate(value).getTime())
+  return typeof value === 'string' && WANNEER.test(value) && geldig(value)
 }
 
-/** "2026-11-08T14:00" als datum in de tijdzone van de telefoon. */
+/** Datum met of zonder tijd. */
+export function isMoment(value: unknown): value is string {
+  return typeof value === 'string' && (WANNEER.test(value) || DATUM.test(value)) && geldig(value)
+}
+
+function geldig(value: string): boolean {
+  const d = toDate(value)
+  return !isNaN(d.getTime()) && dagSleutel(d) === value.slice(0, 10)
+}
+
+export function heeftTijdDeel(wanneer: string): boolean {
+  return wanneer.length > 10
+}
+
+/** De datum (en tijd) zoals je die ziet: zonder tijd als het kenmerk Tijd uit staat (F41). */
+export function zichtbaar(wanneer: string, tijd: boolean): string {
+  return tijd ? wanneer : wanneer.slice(0, 10)
+}
+
+/** Is `inAgenda` dezelfde datum (en tijd) als die je bij het item ziet (F34)? */
+export function momentGelijk(inAgenda: string, wanneer: string | undefined, tijd: boolean): boolean {
+  return wanneer !== undefined && zichtbaar(wanneer, tijd) === inAgenda
+}
+
+/** "2026-11-08T14:00" of "2026-11-08" (dan 00:00) als datum in de tijdzone van de telefoon. */
 export function toDate(wanneer: string): Date {
-  const [d, t] = wanneer.split('T')
+  const [d, t = '00:00'] = wanneer.split('T')
   const [y, m, day] = d.split('-').map(Number)
   const [h, min] = t.split(':').map(Number)
   return new Date(y, m - 1, day, h, min)
 }
 
+/** "2026-11-08" voor een datum. */
+export function dagSleutel(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 const DAGEN = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za']
 const MAANDEN = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
-/** Bijv. "za 8 nov 14:00"; in een ander jaar met het jaartal erbij: "vr 1 jan 2027 09:30" (F33). */
+/**
+ * Bijv. "za 8 nov 14:00", zonder tijd "za 8 nov"; in een ander jaar met het jaartal erbij: "vr 1 jan 2027 09:30"
+ * (F33).
+ */
 export function formatWanneer(wanneer: string, now: Date = new Date()): string {
   const d = toDate(wanneer)
   const jaar = d.getFullYear() === now.getFullYear() ? '' : ` ${d.getFullYear()}`
-  const tijd = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  return `${DAGEN[d.getDay()]} ${d.getDate()} ${MAANDEN[d.getMonth()]}${jaar} ${tijd}`
+  const tijd = heeftTijdDeel(wanneer) ? ` ${wanneer.slice(11)}` : ''
+  return `${DAGEN[d.getDay()]} ${d.getDate()} ${MAANDEN[d.getMonth()]}${jaar}${tijd}`
 }
 
-/** Is het moment al voorbij? Dan staat de datum in rood (F33). */
+/** Is het moment al voorbij (zonder tijd: is de dag voorbij)? Dan staat de datum in rood (F33). */
 export function isVoorbij(wanneer: string, now: Date = new Date()): boolean {
+  if (!heeftTijdDeel(wanneer)) return wanneer < dagSleutel(now)
   return toDate(wanneer).getTime() < now.getTime()
 }
 
 /**
- * Items van een herinneringslijstje op datum: de eerstvolgende bovenaan, items zonder datum onderaan
+ * Items van een lijstje met Datum op datum: de eerstvolgende bovenaan, items zonder datum onderaan
  * in hun eigen volgorde (F33).
  */
 export function opDatum<T extends { wanneer?: string }>(items: readonly T[]): T[] {
@@ -100,6 +137,14 @@ function times(wanneer: string): { start: Date; eind: Date } {
   return { start, eind: new Date(start.getTime() + DUUR_MINUTEN * 60000) }
 }
 
+/** Zonder tijd: een agenda-item voor de hele dag, tot de volgende dag. */
+function heleDag(wanneer: string): { start: Date; eind: Date } {
+  const start = toDate(wanneer)
+  return { start, eind: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) }
+}
+
+const compactDag = (d: Date) => dagSleutel(d).replace(/-/g, '')
+
 function omschrijving(a: Afspraak): string {
   return `Uit Lijstjes: ${a.lijstje}`
 }
@@ -114,11 +159,12 @@ function tijdzone(): string {
 
 /** Een ingevuld nieuw afspraak-scherm in Google Agenda. */
 export function googleUrl(a: Afspraak): string {
-  const { start, eind } = times(a.wanneer)
+  const dag = !heeftTijdDeel(a.wanneer)
+  const { start, eind } = dag ? heleDag(a.wanneer) : times(a.wanneer)
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: a.titel,
-    dates: `${compactLocal(start)}/${compactLocal(eind)}`,
+    dates: dag ? `${compactDag(start)}/${compactDag(eind)}` : `${compactLocal(start)}/${compactLocal(eind)}`,
     ctz: tijdzone(),
     details: omschrijving(a),
   })
@@ -127,13 +173,15 @@ export function googleUrl(a: Afspraak): string {
 
 /** Een ingevuld nieuw afspraak-scherm in Outlook op het web: privé (outlook.com) of werk (Microsoft 365). */
 export function outlookUrl(a: Afspraak, werk: boolean): string {
-  const { start, eind } = times(a.wanneer)
+  const dag = !heeftTijdDeel(a.wanneer)
+  const { start, eind } = dag ? heleDag(a.wanneer) : times(a.wanneer)
   const params = new URLSearchParams({
     path: '/calendar/action/compose',
     rru: 'addevent',
     subject: a.titel,
-    startdt: start.toISOString(),
-    enddt: eind.toISOString(),
+    startdt: dag ? dagSleutel(start) : start.toISOString(),
+    enddt: dag ? dagSleutel(eind) : eind.toISOString(),
+    ...(dag && { allday: 'true' }),
     body: omschrijving(a),
   })
   const host = werk ? 'outlook.office.com' : 'outlook.live.com'
@@ -146,7 +194,8 @@ function icsText(value: string): string {
 
 /** Een agenda-bestand (.ics) dat elke agenda-app kan openen. */
 export function icsBestand(a: Afspraak, now: Date = new Date()): string {
-  const { start, eind } = times(a.wanneer)
+  const dag = !heeftTijdDeel(a.wanneer)
+  const { start, eind } = dag ? heleDag(a.wanneer) : times(a.wanneer)
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -156,8 +205,8 @@ export function icsBestand(a: Afspraak, now: Date = new Date()): string {
     'BEGIN:VEVENT',
     `UID:${a.id}-${compactUtc(start)}@lijstjes`,
     `DTSTAMP:${compactUtc(now)}`,
-    `DTSTART:${compactUtc(start)}`,
-    `DTEND:${compactUtc(eind)}`,
+    dag ? `DTSTART;VALUE=DATE:${compactDag(start)}` : `DTSTART:${compactUtc(start)}`,
+    dag ? `DTEND;VALUE=DATE:${compactDag(eind)}` : `DTEND:${compactUtc(eind)}`,
     `SUMMARY:${icsText(a.titel)}`,
     `DESCRIPTION:${icsText(omschrijving(a))}`,
     'END:VEVENT',
