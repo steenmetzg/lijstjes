@@ -29,6 +29,8 @@ import {
   type Lijstje,
 } from './lists'
 import { isAgenda, PER_ITEM, volgendeKeer, zetInAgenda, zichtbaar, type AgendaKeuze } from './agenda'
+import NewVersion from './NewVersion'
+import { markVersionSeen, versionToAnnounce } from './newVersion'
 import Reminders from './Reminders'
 import { dueItems } from './reminders'
 import Settings from './Settings'
@@ -66,7 +68,13 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  const reminders =
+  // Melding na het bijwerken van de app, tot je hem sluit (F45).
+  const [newVersion, setNewVersion] = useState(() => versionToAnnounce(__APP_VERSION__))
+  useEffect(() => {
+    if (newVersion === null) markVersionSeen(__APP_VERSION__)
+  }, [newVersion])
+
+  const dueMelding =
     due.length > 0 ? (
       <Reminders
         due={due}
@@ -79,6 +87,15 @@ export default function App() {
         }
         onClose={() => setShowReminders(false)}
       />
+    ) : null
+
+  // Onderaan het scherm: eerst de melding van een nieuwe versie, dan de herinneringen.
+  const reminders =
+    newVersion || dueMelding ? (
+      <>
+        {newVersion && <NewVersion version={newVersion} onClose={() => setNewVersion(null)} />}
+        {dueMelding}
+      </>
     ) : null
 
   useEffect(() => saveLijstjes(lijstjes), [lijstjes])

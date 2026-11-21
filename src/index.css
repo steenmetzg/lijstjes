@@ -1295,3 +1295,26 @@ html.vak-open body {
 .date-field.met-tijd .date-clear {
   width: 28px;
 }
+
+/* Melding na het bijwerken van de app (F45), zoals in WoonWerk. */
+.voice.new-version {
+  align-items: flex-start;
+}
+
+.new-version-body {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+.new-version-body strong {
+  color: var(--accent);
+}
+
+.inline-icon {
+  display: inline-grid;
+  place-items: center;
+  vertical-align: -3px;
+  color: var(--accent);
+}
