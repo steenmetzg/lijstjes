@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { formatWanneer, googleUrl, icsBestand, isVoorbij, opDatum, outlookUrl } from './agenda'
+import { formatWanneer, googleUrl, icsBestand, isVoorbij, leesDatum, leesTijd, opDatum, outlookUrl } from './agenda'
 import { createBackup, parseBackup } from './backup'
 import { HERINNERINGEN_KEY, KENMERKEN_KEY, LISTS_KEY, loadLijstjes, parseLijstjes, splitAantal, type Lijstje } from './lists'
 import { itemTexts, list, storeLists, typeItem } from './test/helpers'
@@ -50,7 +50,9 @@ async function openDetails(user: User, tekst: string): Promise<HTMLElement> {
 /** Vult datum (en tijd) in het vak van een item in en bewaart. */
 async function setDate(user: User, tekst: string, datum: string, tijd?: string) {
   const box = await openDetails(user, tekst)
-  fireEvent.change(within(box).getByLabelText('Datum'), { target: { value: datum } })
+  // Getypt als dag-maand-jaar.
+  const getypt = datum ? datum.split('-').reverse().join('-') : ''
+  fireEvent.change(within(box).getByLabelText('Datum'), { target: { value: getypt } })
   if (tijd !== undefined) fireEvent.change(within(box).getByLabelText('Tijd'), { target: { value: tijd } })
   await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
 }
@@ -150,6 +152,58 @@ describe('AC26: datum en tijd', () => {
     expect(isVoorbij('2026-11-07', new Date(2026, 10, 7, 23, 0))).toBe(false)
   })
 
+  it('zolang het vak open is, scrolt de pagina erachter niet', async () => {
+    storeAfspraken({})
+    const user = userEvent.setup()
+    render(<App />)
+    expect(document.documentElement).not.toHaveClass('vak-open')
+    const box = await openDetails(user, 'APK')
+    expect(document.documentElement).toHaveClass('vak-open')
+    await user.click(within(box).getByRole('button', { name: 'Annuleren' }))
+    expect(document.documentElement).not.toHaveClass('vak-open')
+  })
+
+  it('leest een getypte datum en tijd', () => {
+    const now = new Date(2026, 10, 7)
+    expect(leesDatum('25-11-2026', now)).toBe('2026-11-25')
+    expect(leesDatum('25/11/26', now)).toBe('2026-11-25')
+    expect(leesDatum('5.1.2027', now)).toBe('2027-01-05')
+    expect(leesDatum('25 11', now)).toBe('2026-11-25')
+    expect(leesDatum('2511', now)).toBe('2026-11-25')
+    expect(leesDatum('25112026', now)).toBe('2026-11-25')
+    expect(leesDatum('', now)).toBe('')
+    expect(leesDatum('31-02-2026', now)).toBeNull()
+    expect(leesDatum('morgen', now)).toBeNull()
+    expect(leesTijd('9:30')).toBe('09:30')
+    expect(leesTijd('9.30')).toBe('09:30')
+    expect(leesTijd('930')).toBe('09:30')
+    expect(leesTijd('1415')).toBe('14:15')
+    expect(leesTijd('9')).toBe('09:00')
+    expect(leesTijd('25:00')).toBeNull()
+  })
+
+  it('typen in het datumveld werkt, met een melding bij een onbekende datum', async () => {
+    storeAfspraken({})
+    const user = userEvent.setup()
+    render(<App />)
+    const box = await openDetails(user, 'APK')
+    expect(within(box).getByRole('button', { name: 'Datum kiezen' })).toBeInTheDocument()
+    await user.type(within(box).getByLabelText('Datum'), '2011')
+    await user.type(within(box).getByLabelText('Tijd'), '830')
+    // Bij het verlaten van het veld wordt het netjes geschreven.
+    expect(within(box).getByLabelText('Datum')).toHaveValue('20-11-2026')
+    await user.click(within(box).getByLabelText('Tekst'))
+    expect(within(box).getByLabelText('Tijd')).toHaveValue('08:30')
+    await user.clear(within(box).getByLabelText('Datum'))
+    await user.type(within(box).getByLabelText('Datum'), '32-11')
+    await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Die datum ken ik niet.')
+    expect(screen.getByRole('region', { name: 'Details van APK' })).toBeInTheDocument()
+    await user.clear(within(box).getByLabelText('Datum'))
+    await user.type(within(box).getByLabelText('Datum'), '20-11{Enter}')
+    expect(screen.getByText('vr 20 nov 08:30')).toBeInTheDocument()
+  })
+
   it('zet items met datum op volgorde en items zonder datum onderaan', () => {
     const items = [{ id: 'a' }, { id: 'b', wanneer: '2026-12-01T10:00' }, { id: 'c' }, { id: 'd', wanneer: '2026-11-20' }]
     expect(opDatum(items).map((i) => i.id)).toEqual(['d', 'b', 'a', 'c'])
@@ -170,7 +224,7 @@ describe('AC27: in de agenda zetten', () => {
     expect(screen.queryByRole('region', { name: 'Details van APK' })).not.toBeInTheDocument()
 
     box = await openDetails(user, 'Tandarts')
-    expect(within(box).getByLabelText('Datum')).toHaveValue('2026-11-12')
+    expect(within(box).getByLabelText('Datum')).toHaveValue('12-11-2026')
     expect(within(box).getByLabelText('Tijd')).toHaveValue('09:30')
     await user.click(within(box).getByRole('button', { name: 'In agenda zetten' }))
     const choice = screen.getByRole('region', { name: 'Agenda kiezen' })
@@ -200,7 +254,7 @@ describe('AC27: in de agenda zetten', () => {
 
     // Volgende item: geen keuze meer, meteen naar Google Agenda.
     box = await openDetails(user, 'APK')
-    fireEvent.change(within(box).getByLabelText('Datum'), { target: { value: '2026-11-20' } })
+    fireEvent.change(within(box).getByLabelText('Datum'), { target: { value: '20-11-2026' } })
     fireEvent.change(within(box).getByLabelText('Tijd'), { target: { value: '08:00' } })
     await user.click(within(box).getByRole('button', { name: 'In agenda zetten' }))
     expect(screen.queryByRole('region', { name: 'Agenda kiezen' })).not.toBeInTheDocument()
@@ -218,7 +272,7 @@ describe('AC27: in de agenda zetten', () => {
     await user.click(within(change).getByRole('button', { name: 'Outlook (werk)' }))
     expect(open).toHaveBeenCalledTimes(2)
     box = await openDetails(user, 'Anne bellen')
-    fireEvent.change(within(box).getByLabelText('Datum'), { target: { value: '2026-11-21' } })
+    fireEvent.change(within(box).getByLabelText('Datum'), { target: { value: '21-11-2026' } })
     await user.click(within(box).getByRole('button', { name: 'In agenda zetten' }))
     expect(new URL(open.mock.calls[2][0]).hostname).toBe('outlook.office.com')
     expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.agenda).toBe('outlook-werk')
@@ -233,7 +287,7 @@ describe('AC27: in de agenda zetten', () => {
     render(<App />)
     await kenmerken(user, 'Klussen', ['Datum'])
     const box = await openDetails(user, 'heg knippen')
-    fireEvent.change(within(box).getByLabelText('Datum'), { target: { value: '2026-11-20' } })
+    fireEvent.change(within(box).getByLabelText('Datum'), { target: { value: '20-11-2026' } })
     await user.click(within(box).getByRole('button', { name: 'In agenda zetten' }))
     await user.click(screen.getByRole('button', { name: 'Google Agenda' }))
     expect(new URL(open.mock.calls[0][0]).searchParams.get('dates')).toBe('20261120/20261121')
@@ -564,8 +618,8 @@ describe('AC37: aantal en notitie', () => {
     const box = screen.getByRole('region', { name: 'Nieuw item' })
     // Datum en tijd op één regel.
     const datum = within(box).getByLabelText('Datum')
-    expect(datum.parentElement).toBe(within(box).getByLabelText('Tijd').parentElement)
-    fireEvent.change(datum, { target: { value: '2026-11-10' } })
+    expect(datum.closest('.date-field')).toBe(within(box).getByLabelText('Tijd').closest('.date-field'))
+    fireEvent.change(datum, { target: { value: '10-11-2026' } })
     fireEvent.change(within(box).getByLabelText('Tijd'), { target: { value: '11:00' } })
     await user.click(within(box).getByRole('button', { name: 'In agenda zetten' }))
     expect(new URL(open.mock.calls[0][0]).searchParams.get('text')).toBe('Kapper')
