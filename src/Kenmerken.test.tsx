@@ -2,7 +2,18 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { formatWanneer, googleUrl, icsBestand, isVoorbij, leesDatum, leesTijd, opDatum, outlookUrl } from './agenda'
+import {
+  deelTekst,
+  formatWanneer,
+  googleUrl,
+  icsBestand,
+  isVoorbij,
+  leesDatum,
+  leesTijd,
+  opDatum,
+  outlookUrl,
+  volgendeKeer,
+} from './agenda'
 import { createBackup, parseBackup } from './backup'
 import { HERINNERINGEN_KEY, KENMERKEN_KEY, LISTS_KEY, loadLijstjes, parseLijstjes, splitAantal, type Lijstje } from './lists'
 import { itemTexts, list, storeLists, typeItem } from './test/helpers'
@@ -81,12 +92,14 @@ describe('AC25: kenmerken kiezen', () => {
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Klussen' }))
     const box = screen.getByRole('region', { name: 'Lijstje aanpassen' })
     const switches = within(box).getAllByRole('switch')
-    expect(switches.map((s) => s.getAttribute('aria-label'))).toEqual(['Datum', 'Tijd', 'Notitie', 'Aantal'])
+    expect(switches.map((s) => s.getAttribute('aria-label'))).toEqual(['Datum', 'Zonder jaar', 'Tijd', 'Notitie', 'Aantal'])
     expect(switches.every((s) => !(s as HTMLInputElement).checked)).toBe(true)
     // Tijd hoort bij een datum.
     expect(within(box).getByRole('switch', { name: 'Tijd' })).toBeDisabled()
+    expect(within(box).getByRole('switch', { name: 'Zonder jaar' })).toBeDisabled()
     await user.click(within(box).getByRole('switch', { name: 'Datum' }))
     expect(within(box).getByRole('switch', { name: 'Tijd' })).toBeEnabled()
+    expect(within(box).getByRole('switch', { name: 'Zonder jaar' })).toBeEnabled()
     await user.click(within(box).getByRole('switch', { name: 'Notitie' }))
     await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
     expect(screen.queryByRole('region', { name: 'Lijstje aanpassen' })).not.toBeInTheDocument()
@@ -673,5 +686,60 @@ describe('AC38: kenmerk uitzetten', () => {
     await setDate(user, 'Tandarts', '2026-11-13')
     await kenmerken(user, 'Afspraken', ['Tijd'])
     expect(screen.getByText('vr 13 nov 09:30')).toBeInTheDocument()
+  })
+})
+
+describe('AC39: datum zonder jaar', () => {
+  it('dag en maand, elk jaar: op de eerstvolgende keer, herinnering op de dag zelf, elk jaar in de agenda', async () => {
+    const open = vi.fn()
+    vi.stubGlobal('open', open)
+    const user = userEvent.setup()
+    storeLists([list('v', 'Verjaardagen', ['Anne', 'Piet', 'Kees'])], 'v')
+    render(<App />)
+    await kenmerken(user, 'Verjaardagen', ['Datum', 'Zonder jaar'])
+    // "Nu" is 7 november 2026: Anne (3 jan) is pas volgend jaar, Piet (7 nov) is vandaag, Kees (20 nov) daartussen.
+    for (const [naam, getypt] of [
+      ['Anne', '3-1'],
+      ['Piet', '0711'],
+      ['Kees', '20-11-1975'],
+    ]) {
+      const box = await openDetails(user, naam)
+      expect(within(box).getByLabelText('Datum')).toHaveAttribute('placeholder', 'dd-mm')
+      await user.type(within(box).getByLabelText('Datum'), `${getypt}{Enter}`)
+    }
+    expect(itemTexts()).toEqual(['Piet', 'Kees', 'Anne'])
+    const rows = screen.getByRole('list', { name: 'Items op Verjaardagen' })
+    expect(within(rows).getByText('3 jan')).not.toHaveClass('past')
+    expect(within(rows).getByText('20 nov')).toBeInTheDocument()
+    // Het vak toont dag en maand zonder jaar.
+    const box = await openDetails(user, 'Kees')
+    expect(within(box).getByLabelText('Datum')).toHaveValue('20-11')
+    await user.click(within(box).getByRole('button', { name: 'Annuleren' }))
+    // Herinnering alleen op de dag zelf.
+    const lines = within(screen.getByRole('region', { name: 'Herinneringen' }))
+      .getAllByRole('button')
+      .filter((b) => b.classList.contains('reminder'))
+    expect(lines.map((b) => b.textContent)).toEqual(['Vandaag Piet (Verjaardagen)'])
+    // In de agenda: de eerstvolgende keer, elk jaar terug.
+    const anne = await openDetails(user, 'Anne')
+    await user.click(within(anne).getByRole('button', { name: 'In agenda zetten' }))
+    await user.click(screen.getByRole('button', { name: 'Google Agenda' }))
+    const url = new URL(open.mock.calls[0][0])
+    expect(url.searchParams.get('dates')).toBe('20270103/20270104')
+    expect(url.searchParams.get('recur')).toBe('RRULE:FREQ=YEARLY')
+  })
+
+  it('rekent de eerstvolgende keer uit, ook voor 29 februari', () => {
+    const now = new Date(2026, 10, 7)
+    expect(volgendeKeer('1975-11-20', now)).toBe('2026-11-20')
+    expect(volgendeKeer('2026-11-07T09:00', now)).toBe('2026-11-07T09:00')
+    expect(volgendeKeer('1990-01-03', now)).toBe('2027-01-03')
+    expect(volgendeKeer('2000-02-29', now)).toBe('2027-02-28')
+    expect(formatWanneer('1975-11-20', now, true)).toBe('20 nov')
+    expect(isVoorbij('1975-11-20', now, true)).toBe(false)
+    expect(opDatum([{ id: 'a', wanneer: '1990-01-03' }, { id: 'b', wanneer: '1975-11-20' }], true, now).map((i) => i.id)).toEqual(['b', 'a'])
+    const a = { id: 'x', titel: 'Anne', lijstje: 'Verjaardagen', wanneer: '2027-01-03', jaarlijks: true }
+    expect(icsBestand(a)).toContain('RRULE:FREQ=YEARLY')
+    expect(deelTekst(a)).toBe('Anne, elk jaar op 3 jan')
   })
 })

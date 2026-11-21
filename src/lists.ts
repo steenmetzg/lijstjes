@@ -24,6 +24,8 @@ export interface Item {
 /** De extra kenmerken die een lijstje per item kan hebben (F41). Tijd werkt alleen samen met Datum. */
 export interface Kenmerken {
   datum?: boolean
+  /** Datum zonder jaar: dag en maand, elk jaar (F44). Alleen samen met Datum. */
+  zonderJaar?: boolean
   tijd?: boolean
   notitie?: boolean
   aantal?: boolean
@@ -31,6 +33,7 @@ export interface Kenmerken {
 
 export const KENMERKEN: readonly { id: keyof Kenmerken; label: string }[] = [
   { id: 'datum', label: 'Datum' },
+  { id: 'zonderJaar', label: 'Zonder jaar' },
   { id: 'tijd', label: 'Tijd' },
   { id: 'notitie', label: 'Notitie' },
   { id: 'aantal', label: 'Aantal' },
@@ -49,6 +52,11 @@ export interface Lijstje {
 /** Staat Datum aan? Tijd telt alleen samen met Datum (F41). */
 export function heeftDatum(l: Lijstje): boolean {
   return l.kenmerken?.datum === true
+}
+
+/** Datum zonder jaar: dag en maand komen elk jaar terug (F44). */
+export function heeftZonderJaar(l: Lijstje): boolean {
+  return heeftDatum(l) && l.kenmerken?.zonderJaar === true
 }
 
 export function heeftTijd(l: Lijstje): boolean {
