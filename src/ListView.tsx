@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   CalendarDays,
   Check,
+  CircleCheck,
   Clock,
   GripVertical,
   Mic,
@@ -63,8 +64,6 @@ interface Props {
   onRemove: (id: string) => void
   onMove: (from: number, to: number) => void
   onClear: (which: 'af' | 'alles') => void
-  /** Gooit de items én het lijstje zelf weg; `null` als dit het laatste lijstje is (F8). */
-  onDeleteList: (() => void) | null
   onBack: () => void
   mic: {
     show: boolean
@@ -332,7 +331,11 @@ function MomentVeld({
         disabled={disabled}
         onClick={() => openPicker(picker.current)}
       >
-        {datum ? <CalendarDays size={17} strokeWidth={1.75} aria-hidden /> : <Clock size={17} strokeWidth={1.75} aria-hidden />}
+        {datum ? (
+          <CalendarDays size={17} strokeWidth={1.75} aria-hidden />
+        ) : (
+          <Clock size={17} strokeWidth={1.75} aria-hidden />
+        )}
       </button>
     </span>
   )
@@ -359,7 +362,6 @@ export default function ListView({
   onRemove,
   onMove,
   onClear,
-  onDeleteList,
   onBack,
   mic,
   onDetails,
@@ -370,7 +372,6 @@ export default function ListView({
   onInstellen,
 }: Props) {
   const [text, setText] = useState('')
-  const [clearing, setClearing] = useState(false)
   // Naam en kenmerken van het lijstje, via de schuifjesknop (F37, F41).
   const [instellen, setInstellen] = useState<{
     naam: string
@@ -411,14 +412,8 @@ export default function ListView({
     input.current?.focus()
   }
 
-  function clear(which: 'af' | 'alles') {
-    onClear(which)
-    setClearing(false)
-  }
-
   /** Sluit de open keuzes in de titelbalk; er staat er steeds hoogstens één open. */
   function closeAll() {
-    setClearing(false)
     setChoosing(null)
     setDetail(null)
     setInstellen(null)
@@ -515,7 +510,7 @@ export default function ListView({
   const detailZien = detail ? (detailWanneer(detail) ?? undefined) : undefined
 
   // Staat er een vak open in de titelbalk, dan scrolt het lijstje erachter niet mee.
-  const vakOpen = clearing || instellen !== null || choosing !== null || detail !== null
+  const vakOpen = instellen !== null || choosing !== null || detail !== null
   useEffect(() => {
     if (!vakOpen) return
     document.documentElement.classList.add('vak-open')
@@ -555,46 +550,38 @@ export default function ListView({
           >
             <SlidersHorizontal size={20} strokeWidth={1.75} aria-hidden />
           </button>
+          {/* Weggooien zonder vraag, zoals F7: eerst de afgevinkte, dan alle items (F8). */}
           <button
             type="button"
-            className="icon-button"
-            aria-label="Lijstje weggooien"
-            aria-expanded={clearing}
-            disabled={items.length === 0 && !onDeleteList}
+            className="icon-button met-kruisje"
+            aria-label="Afgevinkte items weggooien"
+            disabled={!hasDone}
             onClick={() => {
-              const open = clearing
               closeAll()
-              setClearing(!open)
+              onClear('af')
+            }}
+          >
+            <CircleCheck size={20} strokeWidth={1.75} aria-hidden />
+            <span className="kruisje" aria-hidden>
+              <X size={10} strokeWidth={3.5} />
+            </span>
+          </button>
+          <button
+            type="button"
+            className="icon-button met-kruisje"
+            aria-label="Alle items weggooien"
+            disabled={items.length === 0}
+            onClick={() => {
+              closeAll()
+              onClear('alles')
             }}
           >
             <Trash2 size={20} strokeWidth={1.75} aria-hidden />
+            <span className="kruisje" aria-hidden>
+              <X size={10} strokeWidth={3.5} />
+            </span>
           </button>
         </div>
-        {/* De keuzes staan in de vaste titelbalk, zodat ze ook in beeld komen als je omlaag gescrold bent (F8). */}
-        {clearing && (
-          <section className="confirm clear-choice" aria-label="Lijstje weggooien">
-            <strong>Lijstje {lijstje.naam} weggooien</strong>
-            <div className="confirm-buttons">
-              <button type="button" disabled={!hasDone} onClick={() => clear('af')}>
-                Afgevinkte weggooien
-              </button>
-              <button
-                type="button"
-                className="confirm-yes"
-                disabled={items.length === 0}
-                onClick={() => clear('alles')}
-              >
-                Alle items weggooien
-              </button>
-              <button type="button" className="wide" disabled={!onDeleteList} onClick={() => onDeleteList?.()}>
-                Items én het lijstje weggooien
-              </button>
-              <button type="button" className="cancel" onClick={() => setClearing(false)}>
-                Annuleren
-              </button>
-            </div>
-          </section>
-        )}
         {instellen && (
           <section className="confirm clear-choice instellen" aria-label="Lijstje aanpassen">
             <form
