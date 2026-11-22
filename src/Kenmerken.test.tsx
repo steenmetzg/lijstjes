@@ -15,7 +15,15 @@ import {
   volgendeKeer,
 } from './agenda'
 import { createBackup, parseBackup } from './backup'
-import { HERINNERINGEN_KEY, KENMERKEN_KEY, LISTS_KEY, loadLijstjes, parseLijstjes, splitAantal, type Lijstje } from './lists'
+import {
+  HERINNERINGEN_KEY,
+  KENMERKEN_KEY,
+  LISTS_KEY,
+  loadLijstjes,
+  parseLijstjes,
+  splitAantal,
+  type Lijstje,
+} from './lists'
 import { itemTexts, list, storeLists, typeItem } from './test/helpers'
 
 vi.mock('./folderStore', () => ({
@@ -92,7 +100,13 @@ describe('AC25: kenmerken kiezen', () => {
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Klussen' }))
     const box = screen.getByRole('region', { name: 'Lijstje aanpassen' })
     const switches = within(box).getAllByRole('switch')
-    expect(switches.map((s) => s.getAttribute('aria-label'))).toEqual(['Datum', 'Zonder jaar', 'Tijd', 'Notitie', 'Aantal'])
+    expect(switches.map((s) => s.getAttribute('aria-label'))).toEqual([
+      'Datum',
+      'Zonder jaar',
+      'Tijd',
+      'Notitie',
+      'Aantal',
+    ])
     expect(switches.every((s) => !(s as HTMLInputElement).checked)).toBe(true)
     // Tijd hoort bij een datum.
     expect(within(box).getByRole('switch', { name: 'Tijd' })).toBeDisabled()
@@ -218,7 +232,12 @@ describe('AC26: datum en tijd', () => {
   })
 
   it('zet items met datum op volgorde en items zonder datum onderaan', () => {
-    const items = [{ id: 'a' }, { id: 'b', wanneer: '2026-12-01T10:00' }, { id: 'c' }, { id: 'd', wanneer: '2026-11-20' }]
+    const items = [
+      { id: 'a' },
+      { id: 'b', wanneer: '2026-12-01T10:00' },
+      { id: 'c' },
+      { id: 'd', wanneer: '2026-11-20' },
+    ]
     expect(opDatum(items).map((i) => i.id)).toEqual(['d', 'b', 'a', 'c'])
   })
 })
@@ -242,14 +261,11 @@ describe('AC27: in de agenda zetten', () => {
     await user.click(within(box).getByRole('button', { name: 'In agenda zetten' }))
     const choice = screen.getByRole('region', { name: 'Agenda kiezen' })
     expect(within(choice).getByText('In welke agenda?')).toBeInTheDocument()
-    expect(within(choice).getAllByRole('button').map((b) => b.textContent)).toEqual([
-      'Google Agenda',
-      'Outlook (privé)',
-      'Outlook (werk)',
-      'Andere agenda',
-      'Delen…',
-      'Annuleren',
-    ])
+    expect(
+      within(choice)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Google Agenda', 'Outlook (privé)', 'Outlook (werk)', 'Andere agenda', 'Delen…', 'Annuleren'])
     await user.click(within(choice).getByRole('button', { name: 'Google Agenda' }))
     expect(open).toHaveBeenCalledTimes(1)
     const url = new URL(open.mock.calls[0][0])
@@ -319,7 +335,9 @@ describe('AC27: in de agenda zetten', () => {
     expect(new URL(outlookUrl(a, true)).hostname).toBe('outlook.office.com')
     const ics = icsBestand(a, new Date(Date.UTC(2026, 10, 7, 9, 0)))
     expect(ics).toContain('SUMMARY:Tandarts\\, controle')
-    expect(ics).toContain(`DTSTART:${new Date(2026, 10, 12, 9, 30).toISOString().replace(/[-:]/g, '').replace('.000', '')}`)
+    expect(ics).toContain(
+      `DTSTART:${new Date(2026, 10, 12, 9, 30).toISOString().replace(/[-:]/g, '').replace('.000', '')}`,
+    )
     // Zonder tijd: de hele dag.
     const dag = { ...a, wanneer: '2026-11-12' }
     expect(new URL(outlookUrl(dag, false)).searchParams.get('allday')).toBe('true')
@@ -343,7 +361,10 @@ describe('AC28: datum wijzigen van een item in de agenda', () => {
   })
 
   it('waarschuwt niet bij een item dat niet in de agenda staat, of als alleen de notitie verandert', async () => {
-    storeAfspraken({ Tandarts: { wanneer: '2026-11-12T09:30' }, APK: { wanneer: '2026-11-20T08:00', inAgenda: '2026-11-20T08:00' } })
+    storeAfspraken({
+      Tandarts: { wanneer: '2026-11-12T09:30' },
+      APK: { wanneer: '2026-11-20T08:00', inAgenda: '2026-11-20T08:00' },
+    })
     const user = userEvent.setup()
     render(<App />)
     await setDate(user, 'Tandarts', '2026-11-13', '09:30')
@@ -365,8 +386,13 @@ describe('AC30: herinneringen in de app', () => {
     const user = userEvent.setup()
     render(<App />)
     const box = screen.getByRole('region', { name: 'Herinneringen' })
-    const lines = within(box).getAllByRole('button').filter((b) => b.classList.contains('reminder'))
-    expect(lines.map((b) => b.textContent)).toEqual(['do 5 nov 09:00 Anne bellen (Afspraken)', 'Vandaag 16:00 Tandarts (Afspraken)'])
+    const lines = within(box)
+      .getAllByRole('button')
+      .filter((b) => b.classList.contains('reminder'))
+    expect(lines.map((b) => b.textContent)).toEqual([
+      'do 5 nov 09:00 Anne bellen (Afspraken)',
+      'Vandaag 16:00 Tandarts (Afspraken)',
+    ])
     expect(lines[0]).toHaveClass('past')
     expect(lines[1]).not.toHaveClass('past')
     await user.click(within(box).getByRole('button', { name: 'Tandarts afvinken' }))
@@ -387,7 +413,10 @@ describe('AC30: herinneringen in de app', () => {
     storeLists([list('a', 'Klussen', ['heg'])], 'a')
     localStorage.setItem(
       KENMERKEN_KEY,
-      JSON.stringify({ lijstjes: { a: { kenmerken: { datum: true } } }, items: { 'a-0': { wanneer: '2026-11-07T08:00' } } }),
+      JSON.stringify({
+        lijstjes: { a: { kenmerken: { datum: true } } },
+        items: { 'a-0': { wanneer: '2026-11-07T08:00' } },
+      }),
     )
     const { unmount } = render(<App />)
     const lines = within(screen.getByRole('region', { name: 'Herinneringen' }))
@@ -395,7 +424,10 @@ describe('AC30: herinneringen in de app', () => {
       .filter((b) => b.classList.contains('reminder'))
     expect(lines.map((b) => b.textContent)).toEqual(['Vandaag heg (Klussen)'])
     unmount()
-    localStorage.setItem(KENMERKEN_KEY, JSON.stringify({ lijstjes: { a: { kenmerken: {} } }, items: { 'a-0': { wanneer: '2026-11-07' } } }))
+    localStorage.setItem(
+      KENMERKEN_KEY,
+      JSON.stringify({ lijstjes: { a: { kenmerken: {} } }, items: { 'a-0': { wanneer: '2026-11-07' } } }),
+    )
     render(<App />)
     expect(screen.queryByRole('region', { name: 'Herinneringen' })).not.toBeInTheDocument()
   })
@@ -406,7 +438,9 @@ describe('AC30: herinneringen in de app', () => {
     const user = userEvent.setup()
     render(<App />)
     expect(screen.getByRole('heading', { name: 'Mijn lijstjes' })).toBeInTheDocument()
-    await user.click(within(screen.getByRole('region', { name: 'Herinneringen' })).getByRole('button', { name: /^Vandaag/ }))
+    await user.click(
+      within(screen.getByRole('region', { name: 'Herinneringen' })).getByRole('button', { name: /^Vandaag/ }),
+    )
     expect(screen.getByRole('heading', { name: 'Afspraken' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Herinneringen' })).not.toBeInTheDocument()
   })
@@ -458,10 +492,22 @@ describe('AC29: terug naar een oudere versie kan', () => {
 
   it('zet de datums terug als een oudere versie de lijstjes intussen heeft gewijzigd', () => {
     storeAfspraken({ Tandarts: { wanneer: '2026-11-12T09:30' }, APK: { wanneer: '2026-11-20T08:00' } })
-    storeLists([{ id: 'h', naam: 'Afspraken', items: [{ id: 'h-0', tekst: 'Tandarts', af: false }, { id: 'n', tekst: 'kapper', af: false }] }])
+    storeLists([
+      {
+        id: 'h',
+        naam: 'Afspraken',
+        items: [
+          { id: 'h-0', tekst: 'Tandarts', af: false },
+          { id: 'n', tekst: 'kapper', af: false },
+        ],
+      },
+    ])
     localStorage.setItem(
       KENMERKEN_KEY,
-      JSON.stringify({ lijstjes: { h: { kenmerken: { datum: true, tijd: true, notitie: true } } }, items: { 'h-0': { notitie: 'controle' } } }),
+      JSON.stringify({
+        lijstjes: { h: { kenmerken: { datum: true, tijd: true, notitie: true } } },
+        items: { 'h-0': { notitie: 'controle' } },
+      }),
     )
     expect(loadLijstjes()[0]).toEqual({
       id: 'h',
@@ -499,10 +545,20 @@ describe('AC29: terug naar een oudere versie kan', () => {
     const data = JSON.parse(text)
     expect(data.versie).toBe(1)
     expect(parseLijstjes(data.lijstjes)).toEqual([
-      { id: 'h', naam: 'Afspraken', items: [{ id: 't', tekst: 'Tandarts', af: false }, { id: 'k', tekst: 'kapper', af: false }] },
+      {
+        id: 'h',
+        naam: 'Afspraken',
+        items: [
+          { id: 't', tekst: 'Tandarts', af: false },
+          { id: 'k', tekst: 'kapper', af: false },
+        ],
+      },
     ])
     // Versie 1.6 kent alleen datums met tijd.
-    expect(data.herinneringen).toEqual({ lijstjes: { h: { agenda: 'ics' } }, items: { t: { wanneer: '2026-11-12T09:30' } } })
+    expect(data.herinneringen).toEqual({
+      lijstjes: { h: { agenda: 'ics' } },
+      items: { t: { wanneer: '2026-11-12T09:30' } },
+    })
     expect(parseBackup(text).lijstjes).toEqual(lijstjes)
   })
 })
@@ -545,14 +601,11 @@ describe('AC34: per item kiezen', () => {
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
     await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
     const choice = screen.getByRole('region', { name: 'Agenda kiezen' })
-    expect(within(choice).getAllByRole('button').map((b) => b.textContent)).toEqual([
-      'Google Agenda',
-      'Outlook (privé)',
-      'Outlook (werk)',
-      'Andere agenda',
-      'Delen…',
-      'Per item kiezen',
-    ])
+    expect(
+      within(choice)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Google Agenda', 'Outlook (privé)', 'Outlook (werk)', 'Andere agenda', 'Delen…', 'Per item kiezen'])
     await user.click(within(choice).getByRole('button', { name: 'Per item kiezen' }))
     expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.agenda).toBe('per-item')
     for (const [tekst, agenda, host] of [
@@ -606,7 +659,8 @@ describe('AC37: aantal en notitie', () => {
     // Staat het item er al op, dan blijft het vak open met de melding.
     await user.type(screen.getByRole('textbox', { name: 'Item toevoegen' }), 'Melk{Enter}')
     expect(screen.getByRole('status')).toHaveTextContent('Melk staat er al op.')
-    expect(screen.getByRole('region', { name: 'Nieuw item' })).toBeInTheDocument()
+    // De melding staat in het vak zelf, boven de knoppen (AC43).
+    expect(within(screen.getByRole('region', { name: 'Nieuw item' })).getByRole('status')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Annuleren' }))
     expect(itemTexts()).toEqual(['melk', '2 pakken koffie', 'appels', 'gehakt'])
 
@@ -737,7 +791,16 @@ describe('AC39: datum zonder jaar', () => {
     expect(volgendeKeer('2000-02-29', now)).toBe('2027-02-28')
     expect(formatWanneer('1975-11-20', now, true)).toBe('20 nov')
     expect(isVoorbij('1975-11-20', now, true)).toBe(false)
-    expect(opDatum([{ id: 'a', wanneer: '1990-01-03' }, { id: 'b', wanneer: '1975-11-20' }], true, now).map((i) => i.id)).toEqual(['b', 'a'])
+    expect(
+      opDatum(
+        [
+          { id: 'a', wanneer: '1990-01-03' },
+          { id: 'b', wanneer: '1975-11-20' },
+        ],
+        true,
+        now,
+      ).map((i) => i.id),
+    ).toEqual(['b', 'a'])
     const a = { id: 'x', titel: 'Anne', lijstje: 'Verjaardagen', wanneer: '2027-01-03', jaarlijks: true }
     expect(icsBestand(a)).toContain('RRULE:FREQ=YEARLY')
     expect(deelTekst(a)).toBe('Anne, elk jaar op 3 jan')

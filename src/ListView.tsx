@@ -52,7 +52,13 @@ const SWIPE_DELETE = 80
 const SWIPE_LOCK = 10
 
 /** Een melding onderaan; `vast` blijft staan tot je hem sluit (F35). */
-export type Notice = { kind: 'ok' | 'error'; text: string; vast?: boolean }
+export type Notice = {
+  kind: 'ok' | 'error'
+  text: string
+  vast?: boolean
+  /** Hoort bij wat je net typte: de melding staat direct onder het veld (AC43). */
+  bijInvoer?: boolean
+}
 
 interface Props {
   lijstje: Lijstje
@@ -518,6 +524,16 @@ export default function ListView({
   }, [vakOpen])
   const detailInAgenda = detailItem?.inAgenda && detailZien && zichtbaar(detailZien, tijd) === detailItem.inAgenda
 
+  // Een korte foutmelding staat bij het veld waarin je typt: in het open vak, anders onder de invoerregel (F5).
+  const fout = notice && ((notice.kind === 'error' && !notice.vast) || notice.bijInvoer) ? notice.text : null
+  const foutRegel = fout && (
+    <p className={notice?.kind === 'error' ? 'invoer-fout' : 'invoer-fout ok'} role="status" aria-live="polite">
+      {fout}
+    </p>
+  )
+  const foutInVak = instellen !== null || detail !== null
+  const onderaan = fout ? null : notice
+
   return (
     <main className="app list-screen">
       <header ref={header} className="list-header">
@@ -655,6 +671,7 @@ export default function ListView({
                   </button>
                 </p>
               )}
+              {foutInVak && foutRegel}
               <div className="confirm-buttons">
                 <button type="button" className="cancel-half" onClick={() => setInstellen(null)}>
                   Annuleren
@@ -771,6 +788,7 @@ export default function ListView({
                   {zonderJaar && ' (elk jaar)'}.
                 </p>
               )}
+              {foutInVak && foutRegel}
               <div className="confirm-buttons">
                 {datum && (
                   <button
@@ -903,6 +921,7 @@ export default function ListView({
               </button>
             )}
           </form>
+          {!foutInVak && foutRegel}
         </li>
       </ul>
 
@@ -915,9 +934,9 @@ export default function ListView({
             </p>
           </section>
         ) : (
-          notice && (
-            <section className={notice.kind === 'error' ? 'voice error' : 'voice'} aria-live="polite">
-              <p role="status">{notice.text}</p>
+          onderaan && (
+            <section className={onderaan.kind === 'error' ? 'voice error' : 'voice'} aria-live="polite">
+              <p role="status">{onderaan.text}</p>
               <button type="button" className="voice-close" aria-label="Melding sluiten" onClick={onCloseNotice}>
                 <X size={18} strokeWidth={1.75} aria-hidden />
               </button>
