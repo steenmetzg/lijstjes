@@ -402,7 +402,7 @@ export default function App() {
       onInstellen={instellen}
       onDetails={saveDetails}
       onAddDetails={addWithDetails}
-      onFout={(text) => setNotice({ kind: 'error', text })}
+      onFout={(text, veld) => setNotice({ kind: 'error', text, ...(veld && { veld }) })}
       onAgenda={agenda}
       mic={{
         show: speechEnabled && speechSupported(),

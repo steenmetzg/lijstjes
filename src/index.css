@@ -1370,6 +1370,10 @@ html.vak-open body {
   color: var(--accent);
 }
 
-.confirm .invoer-fout {
-  padding: 0;
+.confirm p.invoer-fout {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.875rem;
+  /* In een vak: direct onder het veld, gelijk met de tekst erin (label 54px, ruimte 8px, rand en ruimte 11px). */
+  padding: 6px 0 2px 73px;
 }
