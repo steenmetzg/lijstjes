@@ -79,7 +79,8 @@ interface Props {
   mic: {
     show: boolean
     listening: boolean
-    start: () => void
+    /** Met `inVak` komt wat je zegt in het veld Omschr van het open vak (F46). */
+    start: (inVak?: (tekst: string) => void) => void
     stop: () => void
   }
   /** Tekst en kenmerken van een item bewaren uit het vak met de kenmerken (F42). */
@@ -546,6 +547,11 @@ export default function ListView({
   )
   const foutInVak = instellen !== null || detail !== null
   const datumFout = notice?.veld === 'datum'
+  // Luistert de microfoon voor het veld Omschr in het vak (F46)?
+  const [dicteert, setDicteert] = useState(false)
+  useEffect(() => {
+    if (!mic.listening) setDicteert(false)
+  }, [mic.listening])
   const onderaan = fout ? null : notice
 
   return (
@@ -716,22 +722,43 @@ export default function ListView({
             >
               <label className="field">
                 <span>Omschr</span>
-                <input
-                  type="text"
-                  aria-label="Tekst"
-                  enterKeyHint="done"
-                  autoComplete="off"
-                  maxLength={MAX_TEKST}
-                  // Een nieuw item: verder typen in dit veld (F42).
-                  autoFocus={detail.id === null}
-                  value={detail.tekst}
-                  onChange={(e) =>
-                    setDetail({
-                      ...detail,
-                      tekst: e.target.value.slice(0, MAX_TEKST),
-                    })
-                  }
-                />
+                <span className="tekst-veld">
+                  <input
+                    type="text"
+                    aria-label="Tekst"
+                    enterKeyHint="done"
+                    autoComplete="off"
+                    maxLength={MAX_TEKST}
+                    // Een nieuw item: verder typen in dit veld (F42).
+                    autoFocus={detail.id === null}
+                    value={detail.tekst}
+                    onChange={(e) =>
+                      setDetail({
+                        ...detail,
+                        tekst: e.target.value.slice(0, MAX_TEKST),
+                      })
+                    }
+                  />
+                  {mic.show && (
+                    // Inspreken in het vak: wat je zegt, wordt de omschrijving (F46).
+                    <button
+                      type="button"
+                      className={mic.listening ? 'tekst-mic listening' : 'tekst-mic'}
+                      aria-label={mic.listening ? 'Stoppen met luisteren' : 'Omschrijving inspreken'}
+                      aria-pressed={mic.listening}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        if (mic.listening) mic.stop()
+                        else {
+                          setDicteert(true)
+                          mic.start((tekst) => setDetail((d) => (d ? { ...d, tekst } : d)))
+                        }
+                      }}
+                    >
+                      <Mic size={17} strokeWidth={2} aria-hidden />
+                    </button>
+                  )}
+                </span>
               </label>
               {!datumFout && foutRegel}
               {kenmerken.aantal && (
@@ -959,7 +986,15 @@ export default function ListView({
         {mic.listening ? (
           <section className="voice" aria-live="polite">
             <p>
-              <strong>Luisteren…</strong> Zeg bijvoorbeeld: melk komma brood komma twee pakken koffie
+              {dicteert ? (
+                <>
+                  <strong>Luisteren…</strong> Zeg wat het item is
+                </>
+              ) : (
+                <>
+                  <strong>Luisteren…</strong> Zeg bijvoorbeeld: melk komma brood komma twee pakken koffie
+                </>
+              )}
             </p>
           </section>
         ) : (

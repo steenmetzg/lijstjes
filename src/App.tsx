@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Info from './Info'
 import { useInstallPrompt } from './installPrompt'
 import Lists, { type Deleted } from './Lists'
@@ -34,7 +34,15 @@ import { markVersionSeen, versionToAnnounce } from './newVersion'
 import Reminders from './Reminders'
 import { dueItems } from './reminders'
 import Settings from './Settings'
-import { loadSpeechEnabled, saveSpeechEnabled, speechSupported, bestSpoken, spokenName, useSpeech } from './speech'
+import {
+  loadSpeechEnabled,
+  saveSpeechEnabled,
+  speechSupported,
+  bestSpoken,
+  spokenName,
+  spokenTekst,
+  useSpeech,
+} from './speech'
 
 // Zo lang blijft een melding onderaan het lijstje staan, in milliseconden.
 const NOTICE_MS = 5000
@@ -52,10 +60,18 @@ export default function App() {
   const [justDeleted, setJustDeleted] = useState<Deleted | null>(null)
   const [speechEnabled, setSpeechEnabled] = useState(loadSpeechEnabled)
   const installPrompt = useInstallPrompt()
+  // Inspreken in het vak van een item: wat je zegt, komt in het veld Omschr (F46).
+  const dicteer = useRef<((tekst: string) => void) | null>(null)
   const speech = useSpeech(
     // Op Mijn lijstjes is wat je zegt de naam van een nieuw lijstje (F31), op een lijstje zijn het items (F15).
-    (alternatives) =>
-      screen === 'lijstjes' ? createSpoken(spokenName(alternatives)) : addTexts(bestSpoken(alternatives), true),
+    (alternatives) => {
+      if (dicteer.current) {
+        const tekst = spokenTekst(alternatives)
+        if (tekst) dicteer.current(tekst)
+        else setNotice({ kind: 'error', text: 'Ik verstond niets. Probeer het opnieuw.' })
+      } else if (screen === 'lijstjes') createSpoken(spokenName(alternatives))
+      else addTexts(bestSpoken(alternatives), true)
+    },
     (text) => setNotice({ kind: 'error', text }),
   )
   const lijstje = lijstjes.find((l) => l.id === huidig) ?? lijstjes[0]
@@ -372,6 +388,7 @@ export default function App() {
           listening: speech.listening,
           start: () => {
             setNotice(null)
+            dicteer.current = null
             speech.start()
           },
           stop: speech.stop,
@@ -416,8 +433,9 @@ export default function App() {
       mic={{
         show: speechEnabled && speechSupported(),
         listening: speech.listening,
-        start: () => {
+        start: (inVak) => {
           setNotice(null)
+          dicteer.current = inVak ?? null
           speech.start()
         },
         stop: speech.stop,

@@ -1382,3 +1382,35 @@ html.vak-open body {
   /* In een vak: direct onder het veld, gelijk met de tekst erin (label 54px, ruimte 8px, rand en ruimte 11px). */
   padding: 6px 0 2px 73px;
 }
+
+/* Omschr in het vak met rechts in het veld een kleine microfoon (F46). */
+.tekst-veld {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.field .tekst-veld input {
+  padding-right: 38px;
+}
+
+.tekst-mic {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tekst-mic.listening {
+  background: var(--accent);
+  color: #ffffff;
+}

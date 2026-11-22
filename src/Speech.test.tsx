@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -61,7 +61,13 @@ describe('splitSpoken', () => {
   })
 
   it('splitst ook als Chrome "komma" anders schrijft', () => {
-    expect(splitSpoken('melk Komma brood comma kaas koma eieren coma thee')).toEqual(['melk', 'brood', 'kaas', 'eieren', 'thee'])
+    expect(splitSpoken('melk Komma brood comma kaas koma eieren coma thee')).toEqual([
+      'melk',
+      'brood',
+      'kaas',
+      'eieren',
+      'thee',
+    ])
     expect(splitSpoken('melk komma. Brood')).toEqual(['melk', 'brood'])
     expect(splitSpoken('komma melk komma')).toEqual(['melk'])
     expect(splitSpoken('kommando en kommapunt')).toEqual(['kommando en kommapunt'])
@@ -181,5 +187,25 @@ describe('AC24: naam van een nieuw lijstje inspreken', () => {
     localStorage.setItem(SPEECH_KEY, 'nee')
     render(<App />)
     expect(screen.queryByRole('button', { name: 'Naam inspreken' })).not.toBeInTheDocument()
+  })
+})
+
+describe('AC44: inspreken in het vak van een item', () => {
+  it('zet wat je zegt in zijn geheel in Omschr, ook met "komma", zonder het item al te bewaren', async () => {
+    const user = userEvent.setup()
+    storeLists([list('a', 'AH', ['melk'])], 'a')
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van AH' }))
+    await user.click(screen.getByRole('switch', { name: 'Aantal' }))
+    await user.click(screen.getByRole('button', { name: 'Bewaren' }))
+    await user.type(screen.getByRole('textbox', { name: 'Item toevoegen' }), 'k')
+    const box = screen.getByRole('region', { name: 'Nieuw item' })
+    await user.click(within(box).getByRole('button', { name: 'Omschrijving inspreken' }))
+    expect(screen.getByText('Zeg wat het item is')).toBeInTheDocument()
+    FakeRecognition.last!.hear('Kaas komma jong belegen.')
+    expect(within(box).getByLabelText('Tekst')).toHaveValue('kaas komma jong belegen')
+    expect(itemTexts()).toEqual(['melk'])
+    await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
+    expect(itemTexts()).toEqual(['melk', 'kaas komma jong belegen'])
   })
 })
