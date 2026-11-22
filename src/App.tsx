@@ -108,7 +108,8 @@ export default function App() {
   useEffect(() => saveSpeechEnabled(speechEnabled), [speechEnabled])
 
   useEffect(() => {
-    if (!notice || notice.vast) return
+    // Een melding bij wat je typte blijft staan tot je weer typt of inspreekt (AC43).
+    if (!notice || notice.vast || notice.bijInvoer || notice.kind === 'error') return
     const timer = setTimeout(() => setNotice(null), NOTICE_MS)
     return () => clearTimeout(timer)
   }, [notice])
@@ -177,14 +178,19 @@ export default function App() {
    * Bewaart tekst en kenmerken van een item (F42). Stond het item met de oude datum in de agenda, dan moet je dat
    * agenda-item zelf weghalen (F35).
    */
-  function saveDetails(id: string, tekst: string, details: Details) {
+  function saveDetails(id: string, tekst: string, details: Details): boolean {
     const item = lijstje.items.find((i) => i.id === id)
-    if (!item) return
+    if (!item) return true
     const tijd = heeftTijd(lijstje)
     let next = setDetails(lijstje, id, details)
     let error: string | null = null
     if (tekst.trim() !== item.tekst) {
       const result = editItem(next, id, tekst)
+      // Staat de nieuwe tekst al als ander item op het lijstje, dan blijft het vak open met de melding (AC43).
+      if (result.error) {
+        setNotice({ kind: 'error', text: result.error })
+        return false
+      }
       next = result.lijstje
       error = result.error
     }
@@ -199,6 +205,7 @@ export default function App() {
     } else {
       setNotice(error ? { kind: 'error', text: error } : null)
     }
+    return true
   }
 
   /**
@@ -387,7 +394,9 @@ export default function App() {
       onEdit={(id, text) => {
         const result = editItem(lijstje, id, text)
         update(lijstje.id, () => result.lijstje)
-        setNotice(result.error ? { kind: 'error', text: result.error } : null)
+        // De melding staat onder het item dat je aanpaste (AC43).
+        setNotice(result.error ? { kind: 'error', text: result.error, itemId: id } : null)
+        return !result.error
       }}
       onMove={(from, to) => update(lijstje.id, (l) => moveItem(l, from, to))}
       onRemove={(id) => update(lijstje.id, (l) => ({ ...l, items: l.items.filter((i) => i.id !== id) }))}

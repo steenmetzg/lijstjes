@@ -268,7 +268,12 @@ export default function Lists({
   const onderaan = korteFout ? null : notice
 
   return (
-    <main className="app lists-screen">
+    <main
+      className="app lists-screen"
+      onInput={() => {
+        if (korteFout) onCloseNotice()
+      }}
+    >
       <header ref={header} className="main-header">
         <h1>Mijn lijstjes</h1>
         <div className="header-actions">
@@ -341,7 +346,15 @@ export default function Lists({
                 className={mic.listening ? 'icon-button mic listening' : 'icon-button mic'}
                 aria-label={mic.listening ? 'Stoppen met luisteren' : 'Naam inspreken'}
                 aria-pressed={mic.listening}
-                onClick={mic.listening ? mic.stop : mic.start}
+                onClick={() => {
+                  // Inspreken haalt de melding bij wat je typte weg (AC43).
+                  if (mic.listening) mic.stop()
+                  else {
+                    if (korteFout) onCloseNotice()
+                    setError(null)
+                    mic.start()
+                  }
+                }}
               >
                 <Mic size={16} strokeWidth={2} aria-hidden />
               </button>

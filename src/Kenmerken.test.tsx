@@ -623,6 +623,25 @@ describe('AC34: per item kiezen', () => {
   })
 })
 
+describe('AC43: melding in het vak van een item', () => {
+  it('een bestaand item aanpassen naar een tekst die er al op staat: het vak blijft open, melding onder Omschr', async () => {
+    const user = userEvent.setup()
+    storeLists([list('a', 'AH', ['melk', 'brood'])], 'a')
+    render(<App />)
+    await kenmerken(user, 'AH', ['Notitie'])
+    const box = await openDetails(user, 'melk')
+    await user.clear(within(box).getByLabelText('Tekst'))
+    await user.type(within(box).getByLabelText('Tekst'), 'Brood')
+    await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
+    const melding = within(box).getByRole('status')
+    expect(melding).toHaveTextContent('Brood staat er al op.')
+    expect(melding.previousElementSibling).toContainElement(within(box).getByLabelText('Tekst'))
+    // Weer typen haalt de melding weg.
+    await user.type(within(box).getByLabelText('Tekst'), 'x')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+})
+
 describe('AC37: aantal en notitie', () => {
   it('met Aantal wordt "3 appels" aantal 3 en tekst appels; de notitie staat klein onder het item', async () => {
     const user = userEvent.setup()
