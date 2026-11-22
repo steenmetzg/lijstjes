@@ -34,3 +34,31 @@ export function markVersionSeen(current: string): void {
     // Geen opslag: dan komt de melding de volgende keer gewoon nog eens.
   }
 }
+
+/** Of het welkom al gesloten is: 'open' zolang hij er staat, 'gezien' na het kruisje (F47). */
+export const WELKOM_KEY = `${KEY_PREFIX}welkom`
+
+/**
+ * Of het welkom getoond moet worden (F47): bij de allereerste keer openen (nog niets opgeslagen, ook in een net
+ * geïnstalleerde app op de iPhone) en daarna tot je hem sluit.
+ */
+export function welkomTonen(): boolean {
+  try {
+    const welkom = localStorage.getItem(WELKOM_KEY)
+    if (welkom !== null) return welkom === 'open'
+    if (BESTAANDE_GEGEVENS.some((key) => localStorage.getItem(key) !== null)) return false
+    localStorage.setItem(WELKOM_KEY, 'open')
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Onthoudt dat het welkom gesloten is; daarna komt het niet meer terug. */
+export function welkomGezien(): void {
+  try {
+    localStorage.setItem(WELKOM_KEY, 'gezien')
+  } catch {
+    // Geen opslag: dan staat het welkom er de volgende keer weer.
+  }
+}
