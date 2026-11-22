@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { LISTS_KEY } from './lists'
@@ -90,7 +90,8 @@ describe('AC46: welkom bij de allereerste keer openen', () => {
     const { unmount } = render(<App />)
     expect(welkom()).toHaveTextContent('Welkom bij Lijstjes!')
     expect(welkom()).toHaveTextContent('Hou eenvoudig verschillende lijstjes op je telefoon bij.')
-    expect(screen.getByRole('img', { name: 'i-icoontje' })).toBeInTheDocument()
+    // Het i-icoontje in de tekst opent de informatie.
+    expect(within(welkom()!).getByRole('button', { name: 'Helptekst openen' })).toBeInTheDocument()
     expect(melding()).toBeNull()
     unmount()
     // Niet gesloten: de volgende keer staat het er weer.
@@ -101,6 +102,13 @@ describe('AC46: welkom bij de allereerste keer openen', () => {
     tweede.unmount()
     render(<App />)
     expect(welkom()).toBeNull()
+  })
+
+  it('het i-icoontje in het welkom opent de informatie', () => {
+    localStorage.clear()
+    render(<App />)
+    fireEvent.click(within(welkom()!).getByRole('button', { name: 'Helptekst openen' }))
+    expect(screen.getByRole('heading', { name: 'Over Lijstjes' })).toBeInTheDocument()
   })
 
   it('toont geen welkom aan wie de app al gebruikte', () => {

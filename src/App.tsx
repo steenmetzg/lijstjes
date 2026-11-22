@@ -105,6 +105,7 @@ export default function App() {
       <>
         {welkom && (
           <Welkom
+            onInfo={() => setScreen('info')}
             onClose={() => {
               welkomGezien()
               setWelkom(false)
