@@ -623,6 +623,21 @@ describe('AC34: per item kiezen', () => {
   })
 })
 
+describe('AC45: vak Nieuw item meteen open', () => {
+  it('tikken in de invoerregel van een lijstje met kenmerken opent meteen het vak Nieuw item', async () => {
+    const user = userEvent.setup()
+    storeLists([list('a', 'AH', ['melk'])], 'a')
+    render(<App />)
+    await user.click(screen.getByRole('textbox', { name: 'Item toevoegen' }))
+    expect(screen.queryByRole('region', { name: 'Nieuw item' })).not.toBeInTheDocument()
+    await kenmerken(user, 'AH', ['Notitie'])
+    await user.click(screen.getByRole('textbox', { name: 'Item toevoegen' }))
+    const box = screen.getByRole('region', { name: 'Nieuw item' })
+    expect(within(box).getByLabelText('Tekst')).toHaveValue('')
+    expect(within(box).getByLabelText('Tekst')).toHaveFocus()
+  })
+})
+
 describe('AC43: melding in het vak van een item', () => {
   it('een bestaand item aanpassen naar een tekst die er al op staat: het vak blijft open, melding onder Omschr', async () => {
     const user = userEvent.setup()

@@ -208,6 +208,29 @@ describe('AC7: items weggooien', () => {
     expect(itemTexts()).toEqual(['melk', 'kaas'])
   })
 
+  it('kan het weggooien 10 seconden ongedaan maken, met de afgevinkte items op hun plek', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<App />)
+    await typeItem(user, 'melk, brood, kaas')
+    await user.click(itemButton('brood'))
+    await user.click(screen.getByRole('button', { name: 'Afgevinkte items weggooien' }))
+    expect(screen.getByRole('status')).toHaveTextContent('1 item weggegooid')
+    await user.click(screen.getByRole('button', { name: /Ongedaan maken/ }))
+    expect(itemTexts()).toEqual(['melk', 'brood', 'kaas'])
+    await user.click(screen.getByRole('button', { name: 'Alle items weggooien' }))
+    expect(itemTexts()).toEqual([])
+    expect(screen.getByRole('status')).toHaveTextContent('3 items weggegooid')
+    await user.click(screen.getByRole('button', { name: /Ongedaan maken/ }))
+    expect(itemTexts()).toEqual(['melk', 'brood', 'kaas'])
+    await user.click(screen.getByRole('button', { name: 'Alle items weggooien' }))
+    act(() => {
+      vi.advanceTimersByTime(10000)
+    })
+    expect(screen.queryByRole('button', { name: /Ongedaan maken/ })).not.toBeInTheDocument()
+    expect(itemTexts()).toEqual([])
+  })
+
   it('Alle items weggooien gooit meteen alles weg en het lijstje blijft bestaan', async () => {
     const user = userEvent.setup()
     render(<App />)
