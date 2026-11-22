@@ -109,16 +109,17 @@ describe('AC4: dubbel item', () => {
     expect(screen.getByRole('status').closest('li')).toHaveClass('add-row')
   })
 
-  it('laat de melding na 5 seconden verdwijnen', async () => {
+  it('laat de melding staan tot je weer typt of de microfoon gebruikt (AC43)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<App />)
     await typeItem(user, 'melk')
     await typeItem(user, 'melk')
-    expect(screen.getByRole('status')).toBeInTheDocument()
     act(() => {
-      vi.advanceTimersByTime(5000)
+      vi.advanceTimersByTime(60000)
     })
+    expect(screen.getByRole('status')).toHaveTextContent('Melk staat er al op.')
+    await user.type(screen.getByRole('textbox', { name: 'Item toevoegen' }), 'b')
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })
@@ -528,8 +529,12 @@ describe('AC20: item aanpassen', () => {
     await user.click(screen.getByRole('button', { name: 'melk aanpassen' }))
     await user.clear(screen.getByRole('textbox', { name: 'Item aanpassen' }))
     await user.keyboard('Brood{Enter}')
-    expect(itemTexts()).toEqual(['melk', 'brood'])
+    // Het veld blijft open, met de melding direct eronder (AC43).
+    const field = screen.getByRole('textbox', { name: 'Item aanpassen' })
     expect(screen.getByRole('status')).toHaveTextContent('Brood staat er al op.')
+    expect(screen.getByRole('status').closest('li')).toBe(field.closest('li'))
+    await user.keyboard('{Escape}')
+    expect(itemTexts()).toEqual(['melk', 'brood'])
   })
 
   it('laat afvinken met het rondje en weggooien met het kruisje gewoon werken', async () => {

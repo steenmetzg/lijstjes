@@ -58,6 +58,8 @@ export type Notice = {
   vast?: boolean
   /** Hoort bij wat je net typte: de melding staat direct onder het veld (AC43). */
   bijInvoer?: boolean
+  /** Hoort bij dit item, dat je in de regel aanpaste: de melding staat eronder (AC43). */
+  itemId?: string
   /** Hoort bij het datumveld in het vak van een item (AC43). */
   veld?: 'datum'
 }
@@ -68,7 +70,8 @@ interface Props {
   onCloseNotice: () => void
   onAdd: (text: string) => void
   onToggle: (id: string) => void
-  onEdit: (id: string, text: string) => void
+  /** `false`: de nieuwe tekst staat er al op. */
+  onEdit: (id: string, text: string) => boolean
   onRemove: (id: string) => void
   onMove: (from: number, to: number) => void
   onClear: (which: 'af' | 'alles') => void
@@ -80,7 +83,8 @@ interface Props {
     stop: () => void
   }
   /** Tekst en kenmerken van een item bewaren uit het vak met de kenmerken (F42). */
-  onDetails: (id: string, tekst: string, details: Details) => void
+  /** `false`: niet bewaard (de tekst staat er al op); het vak blijft open. */
+  onDetails: (id: string, tekst: string, details: Details) => boolean
   /**
    * Een nieuw item met kenmerken uit het vak Nieuw item (F42); geeft id en tekst van het nieuwe item, of `null` als
    * het niet kan (de melding staat dan onderaan).
@@ -106,7 +110,9 @@ interface RowProps {
   shift: number
   dragging: boolean
   onToggle: () => void
-  onEdit: (text: string) => void
+  onEdit: (text: string) => boolean
+  /** Een foutmelding onder dit item (AC43). */
+  fout: ReactNode
   onRemove: () => void
   grip: Grip
   /** Op datum gesorteerd: geen greep om te verplaatsen (F33). */
@@ -132,6 +138,7 @@ function ItemRow({
   opDatum: gesorteerd,
   kenmerken,
   onOpen,
+  fout,
 }: RowProps) {
   const [dx, setDx] = useState(0)
   const [editing, setEditing] = useState(false)
@@ -177,8 +184,9 @@ function ItemRow({
   function save(e?: FormEvent) {
     e?.preventDefault()
     if (!editing) return
-    setEditing(false)
-    if (text.trim() !== item.tekst) onEdit(text)
+    // Met Enter en een tekst die er al op staat blijft het veld open, met de melding eronder (AC43).
+    const goed = text.trim() === item.tekst || onEdit(text)
+    if (goed || !e) setEditing(false)
   }
 
   const style = dx
@@ -264,6 +272,7 @@ function ItemRow({
             {notitie && <span className="item-note">{notitie}</span>}
           </button>
         )}
+        {fout}
       </div>
       <button type="button" className="item-delete" aria-label={`${item.tekst} weggooien`} onClick={onRemove}>
         <X size={18} strokeWidth={1.75} aria-hidden />
@@ -481,7 +490,7 @@ export default function ListView({
       // Klaar voor het volgende item (F3).
       input.current?.focus()
     } else {
-      onDetails(detail.id, detail.tekst, details)
+      if (!onDetails(detail.id, detail.tekst, details)) return
       item = {
         id: detail.id,
         tekst: detail.tekst.trim() || (detailItem?.tekst ?? ''),
@@ -540,7 +549,13 @@ export default function ListView({
   const onderaan = fout ? null : notice
 
   return (
-    <main className="app list-screen">
+    <main
+      className="app list-screen"
+      // Een melding bij wat je typte blijft staan tot je weer typt (AC43).
+      onInput={() => {
+        if (fout) onCloseNotice()
+      }}
+    >
       <header ref={header} className="list-header">
         <button type="button" className="back-button" aria-label="Terug naar Mijn lijstjes" onClick={onBack}>
           <ArrowLeft size={20} strokeWidth={1.75} aria-hidden />
@@ -879,6 +894,7 @@ export default function ListView({
             dragging={scroll.draggingId === item.id}
             onToggle={() => onToggle(item.id)}
             onEdit={(t) => onEdit(item.id, t)}
+            fout={notice?.itemId === item.id && foutRegel}
             onRemove={() => onRemove(item.id)}
             grip={scroll.gripFor(item.id, index)}
             opDatum={datum}
@@ -921,13 +937,20 @@ export default function ListView({
                 className={mic.listening ? 'icon-button mic listening' : 'icon-button mic'}
                 aria-label={mic.listening ? 'Stoppen met luisteren' : 'Inspreken'}
                 aria-pressed={mic.listening}
-                onClick={mic.listening ? mic.stop : mic.start}
+                onClick={() => {
+                  // Inspreken haalt de melding bij wat je typte weg (AC43).
+                  if (mic.listening) mic.stop()
+                  else {
+                    if (fout) onCloseNotice()
+                    mic.start()
+                  }
+                }}
               >
                 <Mic size={16} strokeWidth={2} aria-hidden />
               </button>
             )}
           </form>
-          {!foutInVak && foutRegel}
+          {!foutInVak && !notice?.itemId && foutRegel}
         </li>
       </ul>
 

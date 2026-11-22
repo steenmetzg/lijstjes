@@ -1366,6 +1366,11 @@ html.vak-open body {
   padding-left: 41px;
 }
 
+.item-body .invoer-fout {
+  /* Onder een item dat je in de regel aanpast: gelijk met de tekst in het veld. */
+  padding: 0 0 10px 7px;
+}
+
 .invoer-fout.ok {
   color: var(--accent);
 }
