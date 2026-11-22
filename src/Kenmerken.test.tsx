@@ -101,11 +101,11 @@ describe('AC25: kenmerken kiezen', () => {
     const box = screen.getByRole('region', { name: 'Lijstje aanpassen' })
     const switches = within(box).getAllByRole('switch')
     expect(switches.map((s) => s.getAttribute('aria-label'))).toEqual([
+      'Aantal',
       'Datum',
       'Zonder jaar',
       'Tijd',
       'Notitie',
-      'Aantal',
     ])
     expect(switches.every((s) => !(s as HTMLInputElement).checked)).toBe(true)
     // Tijd hoort bij een datum.

@@ -828,26 +828,13 @@ h2 {
 .item-line {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 0.3em;
   min-width: 0;
 }
 
-/* Het aantal: een klein lichtblauw label vóór de tekst. */
+/* Het aantal staat gewoon vóór de tekst, in dezelfde letter: "3 kilo kaas" (F42). */
 .item-aantal {
   flex-shrink: 0;
-  padding: 0 7px;
-  border-radius: 9px;
-  background: var(--accent-soft, #e6eefb);
-  color: var(--accent);
-  font-size: 0.85rem;
-  font-weight: 600;
-  line-height: 1.5;
-  text-decoration: none;
-}
-
-.item.done .item-aantal {
-  color: var(--muted);
-  background: var(--bg);
 }
 
 /* Datum en tijd onder de tekst (F33). */

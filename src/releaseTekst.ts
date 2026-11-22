@@ -13,6 +13,8 @@
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
   // Zelfde tekst als 1.7.5: wie die versie oversloeg, ziet alleen de melding van de nieuwste (F45).
+  '1.7.8':
+    'Je kan nu zelf bepalen welke informatie je wilt bijhouden in een Lijstje. Kies voor Datum, Tijd, Datum zonder jaar, Aantal en Notities.',
   '1.7.7':
     'Je kan nu zelf bepalen welke informatie je wilt bijhouden in een Lijstje. Kies voor Datum, Tijd, Datum zonder jaar, Aantal en Notities.',
   '1.7.6':
