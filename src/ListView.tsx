@@ -45,6 +45,8 @@ import {
 } from './lists'
 import { MoreAbove, MoreBelow } from './MoreItems'
 import { useScrollList, type Grip } from './scrollList'
+import { gesprokenMoment } from './spraakDatum'
+import { spokenTekst } from './speech'
 
 // Zo ver (in pixels) veeg je een item naar links om het weg te gooien (F7).
 const SWIPE_DELETE = 80
@@ -52,6 +54,23 @@ const SWIPE_DELETE = 80
 const SWIPE_LOCK = 10
 
 /** Een melding onderaan; `vast` blijft staan tot je hem sluit (F35). */
+/** Een veld in het vak van een item waarin je kunt inspreken (F46). */
+type Veld = 'tekst' | 'aantal' | 'datum' | 'notitie'
+
+const VELD_NAAM: Record<Veld, string> = {
+  tekst: 'Omschrijving',
+  aantal: 'Aantal',
+  datum: 'Datum',
+  notitie: 'Notitie',
+}
+
+const VELD_UITLEG: Record<Veld, string> = {
+  tekst: 'Zeg wat het item is',
+  aantal: 'Zeg het aantal, bijvoorbeeld 3 of 500 gram',
+  datum: 'Zeg de datum, bijvoorbeeld morgen of 25 november om 14:30',
+  notitie: 'Zeg je notitie',
+}
+
 export type Notice = {
   kind: 'ok' | 'error'
   text: string
@@ -79,8 +98,8 @@ interface Props {
   mic: {
     show: boolean
     listening: boolean
-    /** Met `inVak` komt wat je zegt in het veld Omschr van het open vak (F46). */
-    start: (inVak?: (tekst: string) => void) => void
+    /** Met `inVak` gaat wat je zegt naar een veld van het open vak (F46). */
+    start: (inVak?: (gezegd: string) => void) => void
     stop: () => void
   }
   /** Tekst en kenmerken van een item bewaren uit het vak met de kenmerken (F42). */
@@ -548,11 +567,75 @@ export default function ListView({
   const foutInVak = instellen !== null || detail !== null
   const datumFout = notice?.veld === 'datum'
   // Luistert de microfoon voor het veld Omschr in het vak (F46)?
-  const [dicteert, setDicteert] = useState(false)
+  const [dicteert, setDicteert] = useState<Veld | null>(null)
   useEffect(() => {
-    if (!mic.listening) setDicteert(false)
+    if (!mic.listening) setDicteert(null)
   }, [mic.listening])
   const onderaan = fout ? null : notice
+
+  /** Verwerkt wat je in een veld van het vak insprak (F46). */
+  function gezegd(veld: Veld, tekst: string) {
+    const t = tekst.trim()
+    if (!t) {
+      onFout('Ik verstond niets. Probeer het opnieuw.', veld === 'datum' ? 'datum' : undefined)
+      return
+    }
+    if (veld === 'datum') {
+      const m = gesprokenMoment(t, zonderJaar)
+      if (!m) {
+        onFout(
+          `Die datum verstond ik niet. Zeg bijvoorbeeld ${tijd ? '25 november om 14:30' : 'morgen of 25 november'}.`,
+          'datum',
+        )
+        return
+      }
+      setDetail((d) =>
+        d
+          ? {
+              ...d,
+              ...(m.datum && { datum: datumTekst(m.datum, zonderJaar) }),
+              ...(tijd && m.tijd && { tijd: m.tijd }),
+            }
+          : d,
+      )
+      return
+    }
+    const zonderPunt = t.replace(/[.!?]+$/, '').trim()
+    setDetail((d) => {
+      if (!d) return d
+      if (veld === 'tekst') return { ...d, tekst: spokenTekst([t]) }
+      if (veld === 'aantal') return { ...d, aantal: zonderPunt.slice(0, MAX_AANTAL) }
+      // Een notitie vult aan wat er al stond; een nieuwe notitie begint met een hoofdletter.
+      const oud = d.notitie.trim()
+      const zin = oud ? t : t.charAt(0).toLocaleUpperCase('nl') + t.slice(1)
+      return { ...d, notitie: (oud ? `${oud} ${zin}` : zin).slice(0, MAX_NOTITIE) }
+    })
+  }
+
+  /** Een kleine microfoon in een veld van het vak (F46). */
+  function veldMic(veld: Veld) {
+    if (!mic.show) return null
+    const luistert = mic.listening && dicteert === veld
+    return (
+      <button
+        type="button"
+        className={luistert ? 'tekst-mic listening' : 'tekst-mic'}
+        aria-label={luistert ? 'Stoppen met luisteren' : `${VELD_NAAM[veld]} inspreken`}
+        aria-pressed={luistert}
+        onClick={(e) => {
+          e.preventDefault()
+          if (mic.listening) mic.stop()
+          else {
+            if (fout) onCloseNotice()
+            setDicteert(veld)
+            mic.start((t) => gezegd(veld, t))
+          }
+        }}
+      >
+        <Mic size={17} strokeWidth={2} aria-hidden />
+      </button>
+    )
+  }
 
   return (
     <main
@@ -739,46 +822,31 @@ export default function ListView({
                       })
                     }
                   />
-                  {mic.show && (
-                    // Inspreken in het vak: wat je zegt, wordt de omschrijving (F46).
-                    <button
-                      type="button"
-                      className={mic.listening ? 'tekst-mic listening' : 'tekst-mic'}
-                      aria-label={mic.listening ? 'Stoppen met luisteren' : 'Omschrijving inspreken'}
-                      aria-pressed={mic.listening}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        if (mic.listening) mic.stop()
-                        else {
-                          setDicteert(true)
-                          mic.start((tekst) => setDetail((d) => (d ? { ...d, tekst } : d)))
-                        }
-                      }}
-                    >
-                      <Mic size={17} strokeWidth={2} aria-hidden />
-                    </button>
-                  )}
+                  {veldMic('tekst')}
                 </span>
               </label>
               {!datumFout && foutRegel}
               {kenmerken.aantal && (
                 <label className="field">
                   <span>Aantal</span>
-                  <input
-                    type="text"
-                    aria-label="Aantal"
-                    placeholder="bijv. 2 of 500 g"
-                    enterKeyHint="done"
-                    autoComplete="off"
-                    maxLength={MAX_AANTAL}
-                    value={detail.aantal}
-                    onChange={(e) =>
-                      setDetail({
-                        ...detail,
-                        aantal: e.target.value.slice(0, MAX_AANTAL),
-                      })
-                    }
-                  />
+                  <span className="tekst-veld">
+                    <input
+                      type="text"
+                      aria-label="Aantal"
+                      placeholder="bijv. 2 of 500 g"
+                      enterKeyHint="done"
+                      autoComplete="off"
+                      maxLength={MAX_AANTAL}
+                      value={detail.aantal}
+                      onChange={(e) =>
+                        setDetail({
+                          ...detail,
+                          aantal: e.target.value.slice(0, MAX_AANTAL),
+                        })
+                      }
+                    />
+                    {veldMic('aantal')}
+                  </span>
                 </label>
               )}
               {datum && (
@@ -801,6 +869,7 @@ export default function ListView({
                         onChange={(t) => setDetail({ ...detail, tijd: t })}
                       />
                     )}
+                    {veldMic('datum')}
                     <button
                       type="button"
                       className="date-clear"
@@ -817,18 +886,21 @@ export default function ListView({
               {kenmerken.notitie && (
                 <label className="field">
                   <span>Notitie</span>
-                  <textarea
-                    aria-label="Notitie"
-                    rows={3}
-                    maxLength={MAX_NOTITIE}
-                    value={detail.notitie}
-                    onChange={(e) =>
-                      setDetail({
-                        ...detail,
-                        notitie: e.target.value.slice(0, MAX_NOTITIE),
-                      })
-                    }
-                  />
+                  <span className="tekst-veld notitie-veld">
+                    <textarea
+                      aria-label="Notitie"
+                      rows={3}
+                      maxLength={MAX_NOTITIE}
+                      value={detail.notitie}
+                      onChange={(e) =>
+                        setDetail({
+                          ...detail,
+                          notitie: e.target.value.slice(0, MAX_NOTITIE),
+                        })
+                      }
+                    />
+                    {veldMic('notitie')}
+                  </span>
                 </label>
               )}
               {detailInAgenda && detailItem?.inAgenda && (
@@ -988,7 +1060,7 @@ export default function ListView({
             <p>
               {dicteert ? (
                 <>
-                  <strong>Luisteren…</strong> Zeg wat het item is
+                  <strong>Luisteren…</strong> {VELD_UITLEG[dicteert]}
                 </>
               ) : (
                 <>

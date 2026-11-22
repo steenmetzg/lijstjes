@@ -1414,3 +1414,42 @@ html.vak-open body {
   background: var(--accent);
   color: #ffffff;
 }
+
+.notitie-veld .tekst-mic {
+  top: 6px;
+  transform: none;
+}
+
+/* Op de regel met datum en tijd staat de microfoon tussen de velden en het kruisje (F46). */
+.date-field .tekst-mic {
+  position: static;
+  flex-shrink: 0;
+  transform: none;
+}
+
+/* Met tijd en microfoon is de regel vol: alles iets compacter, zodat 25-11-2026 en 14:30 helemaal te zien zijn. */
+.date-field.met-tijd {
+  gap: 2px;
+}
+
+.date-field.met-tijd .moment-veld + .moment-veld {
+  width: 70px;
+}
+
+.date-field.met-tijd .moment-veld input[type='text'] {
+  padding: 0 20px 0 4px;
+}
+
+.date-field.met-tijd .moment-open {
+  width: 21px;
+  padding-right: 3px;
+}
+
+.date-field .tekst-mic {
+  width: 30px;
+  height: 30px;
+}
+
+.date-field.met-tijd .date-clear {
+  width: 22px;
+}
