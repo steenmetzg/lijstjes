@@ -1,4 +1,4 @@
-// Herinneringen (F32 t/m F35): datum en tijd van een item tonen, en een item in je agenda zetten.
+// Kenmerk Datum en Tijd (F33 t/m F35): datum en tijd van een item tonen, en een item in je agenda zetten.
 // Lijstjes zelf stuurt geen meldingen; de herinnering komt van je agenda.
 
 /** De agenda's waar een herinneringslijstje zijn items in kan zetten (F34). */
@@ -38,40 +38,103 @@ export const DUUR_MINUTEN = 30
 /** Datum en tijd zoals het datumveld ze geeft: "2026-11-08T14:00" (lokale tijd). */
 const WANNEER = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
 
+/** Alleen een datum: "2026-11-08" (kenmerk Datum zonder Tijd, F41). */
+const DATUM = /^\d{4}-\d{2}-\d{2}$/
+
+/** Datum met tijd, zoals versie 1.4 t/m 1.6 die kennen. */
 export function isWanneer(value: unknown): value is string {
-  return typeof value === 'string' && WANNEER.test(value) && !isNaN(toDate(value).getTime())
+  return typeof value === 'string' && WANNEER.test(value) && geldig(value)
 }
 
-/** "2026-11-08T14:00" als datum in de tijdzone van de telefoon. */
+/** Datum met of zonder tijd. */
+export function isMoment(value: unknown): value is string {
+  return typeof value === 'string' && (WANNEER.test(value) || DATUM.test(value)) && geldig(value)
+}
+
+function geldig(value: string): boolean {
+  const d = toDate(value)
+  return !isNaN(d.getTime()) && dagSleutel(d) === value.slice(0, 10)
+}
+
+export function heeftTijdDeel(wanneer: string): boolean {
+  return wanneer.length > 10
+}
+
+/** De datum (en tijd) zoals je die ziet: zonder tijd als het kenmerk Tijd uit staat (F41). */
+export function zichtbaar(wanneer: string, tijd: boolean): string {
+  return tijd ? wanneer : wanneer.slice(0, 10)
+}
+
+/** Is `inAgenda` dezelfde datum (en tijd) als die je bij het item ziet (F34)? */
+export function momentGelijk(inAgenda: string, wanneer: string | undefined, tijd: boolean): boolean {
+  return wanneer !== undefined && zichtbaar(wanneer, tijd) === inAgenda
+}
+
+/** "2026-11-08T14:00" of "2026-11-08" (dan 00:00) als datum in de tijdzone van de telefoon. */
 export function toDate(wanneer: string): Date {
-  const [d, t] = wanneer.split('T')
+  const [d, t = '00:00'] = wanneer.split('T')
   const [y, m, day] = d.split('-').map(Number)
   const [h, min] = t.split(':').map(Number)
   return new Date(y, m - 1, day, h, min)
 }
 
+/** "2026-11-08" voor een datum. */
+export function dagSleutel(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 const DAGEN = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za']
 const MAANDEN = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
 
-/** Bijv. "za 8 nov 14:00"; in een ander jaar met het jaartal erbij: "vr 1 jan 2027 09:30" (F33). */
-export function formatWanneer(wanneer: string, now: Date = new Date()): string {
+/**
+ * Bijv. "za 8 nov 14:00", zonder tijd "za 8 nov"; in een ander jaar met het jaartal erbij: "vr 1 jan 2027 09:30"
+ * (F33).
+ */
+export function formatWanneer(wanneer: string, now: Date = new Date(), jaarlijks = false): string {
   const d = toDate(wanneer)
+  const tijd = heeftTijdDeel(wanneer) ? ` ${wanneer.slice(11)}` : ''
+  // Zonder jaar (elk jaar): geen dag van de week, want die verschilt per jaar (F44).
+  if (jaarlijks) return `${d.getDate()} ${MAANDEN[d.getMonth()]}${tijd}`
   const jaar = d.getFullYear() === now.getFullYear() ? '' : ` ${d.getFullYear()}`
-  const tijd = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  return `${DAGEN[d.getDay()]} ${d.getDate()} ${MAANDEN[d.getMonth()]}${jaar} ${tijd}`
+  return `${DAGEN[d.getDay()]} ${d.getDate()} ${MAANDEN[d.getMonth()]}${jaar}${tijd}`
 }
 
-/** Is het moment al voorbij? Dan staat de datum in rood (F33). */
-export function isVoorbij(wanneer: string, now: Date = new Date()): boolean {
+/**
+ * Is het moment al voorbij (zonder tijd: is de dag voorbij)? Dan staat de datum in rood (F33). Zonder jaar komt de
+ * dag elk jaar terug en is hij nooit voorbij (F44).
+ */
+export function isVoorbij(wanneer: string, now: Date = new Date(), jaarlijks = false): boolean {
+  if (jaarlijks) return false
+  if (!heeftTijdDeel(wanneer)) return wanneer < dagSleutel(now)
   return toDate(wanneer).getTime() < now.getTime()
 }
 
 /**
- * Items van een herinneringslijstje op datum: de eerstvolgende bovenaan, items zonder datum onderaan
- * in hun eigen volgorde (F33).
+ * Zonder jaar: de eerstvolgende keer (vandaag of later) dat dag en maand terugkomen, als "2026-11-25" (met de tijd
+ * erachter als die er is) (F44). 29 februari valt in een gewoon jaar op 28 februari.
  */
-export function opDatum<T extends { wanneer?: string }>(items: readonly T[]): T[] {
-  const met = items.filter((i) => i.wanneer).sort((a, b) => a.wanneer!.localeCompare(b.wanneer!))
+export function volgendeKeer(wanneer: string, now: Date = new Date()): string {
+  const vandaag = dagSleutel(now)
+  const rest = wanneer.slice(10)
+  const md = wanneer.slice(5, 10)
+  for (let jaar = now.getFullYear(); ; jaar++) {
+    let dag = `${jaar}-${md}`
+    if (!isMoment(dag)) dag = `${jaar}-02-28`
+    if (dag >= vandaag) return dag + rest
+  }
+}
+
+/**
+ * Items van een lijstje met Datum op datum: de eerstvolgende bovenaan, items zonder datum onderaan
+ * in hun eigen volgorde (F33). Zonder jaar op de eerstvolgende keer dat de dag terugkomt (F44).
+ */
+export function opDatum<T extends { wanneer?: string }>(
+  items: readonly T[],
+  jaarlijks = false,
+  now: Date = new Date(),
+): T[] {
+  const sleutel = (w: string) => (jaarlijks ? volgendeKeer(w, now) : w)
+  const met = items.filter((i) => i.wanneer).sort((a, b) => sleutel(a.wanneer!).localeCompare(sleutel(b.wanneer!)))
   return [...met, ...items.filter((i) => !i.wanneer)]
 }
 
@@ -81,6 +144,8 @@ export interface Afspraak {
   /** De naam van het lijstje, in de omschrijving van het agenda-item. */
   lijstje: string
   wanneer: string
+  /** Zonder jaar: het agenda-item komt elk jaar terug (F44). */
+  jaarlijks?: boolean
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -92,13 +157,24 @@ function compactLocal(d: Date): string {
 
 /** "20261108T130000Z" in UTC. */
 function compactUtc(d: Date): string {
-  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  return d
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '')
 }
 
 function times(wanneer: string): { start: Date; eind: Date } {
   const start = toDate(wanneer)
   return { start, eind: new Date(start.getTime() + DUUR_MINUTEN * 60000) }
 }
+
+/** Zonder tijd: een agenda-item voor de hele dag, tot de volgende dag. */
+function heleDag(wanneer: string): { start: Date; eind: Date } {
+  const start = toDate(wanneer)
+  return { start, eind: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) }
+}
+
+const compactDag = (d: Date) => dagSleutel(d).replace(/-/g, '')
 
 function omschrijving(a: Afspraak): string {
   return `Uit Lijstjes: ${a.lijstje}`
@@ -114,26 +190,30 @@ function tijdzone(): string {
 
 /** Een ingevuld nieuw afspraak-scherm in Google Agenda. */
 export function googleUrl(a: Afspraak): string {
-  const { start, eind } = times(a.wanneer)
+  const dag = !heeftTijdDeel(a.wanneer)
+  const { start, eind } = dag ? heleDag(a.wanneer) : times(a.wanneer)
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: a.titel,
-    dates: `${compactLocal(start)}/${compactLocal(eind)}`,
+    dates: dag ? `${compactDag(start)}/${compactDag(eind)}` : `${compactLocal(start)}/${compactLocal(eind)}`,
     ctz: tijdzone(),
     details: omschrijving(a),
+    ...(a.jaarlijks && { recur: 'RRULE:FREQ=YEARLY' }),
   })
   return `https://calendar.google.com/calendar/render?${params}`
 }
 
 /** Een ingevuld nieuw afspraak-scherm in Outlook op het web: privé (outlook.com) of werk (Microsoft 365). */
 export function outlookUrl(a: Afspraak, werk: boolean): string {
-  const { start, eind } = times(a.wanneer)
+  const dag = !heeftTijdDeel(a.wanneer)
+  const { start, eind } = dag ? heleDag(a.wanneer) : times(a.wanneer)
   const params = new URLSearchParams({
     path: '/calendar/action/compose',
     rru: 'addevent',
     subject: a.titel,
-    startdt: start.toISOString(),
-    enddt: eind.toISOString(),
+    startdt: dag ? dagSleutel(start) : start.toISOString(),
+    enddt: dag ? dagSleutel(eind) : eind.toISOString(),
+    ...(dag && { allday: 'true' }),
     body: omschrijving(a),
   })
   const host = werk ? 'outlook.office.com' : 'outlook.live.com'
@@ -146,7 +226,8 @@ function icsText(value: string): string {
 
 /** Een agenda-bestand (.ics) dat elke agenda-app kan openen. */
 export function icsBestand(a: Afspraak, now: Date = new Date()): string {
-  const { start, eind } = times(a.wanneer)
+  const dag = !heeftTijdDeel(a.wanneer)
+  const { start, eind } = dag ? heleDag(a.wanneer) : times(a.wanneer)
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -156,8 +237,9 @@ export function icsBestand(a: Afspraak, now: Date = new Date()): string {
     'BEGIN:VEVENT',
     `UID:${a.id}-${compactUtc(start)}@lijstjes`,
     `DTSTAMP:${compactUtc(now)}`,
-    `DTSTART:${compactUtc(start)}`,
-    `DTEND:${compactUtc(eind)}`,
+    dag ? `DTSTART;VALUE=DATE:${compactDag(start)}` : `DTSTART:${compactUtc(start)}`,
+    dag ? `DTEND;VALUE=DATE:${compactDag(eind)}` : `DTEND:${compactUtc(eind)}`,
+    ...(a.jaarlijks ? ['RRULE:FREQ=YEARLY'] : []),
     `SUMMARY:${icsText(a.titel)}`,
     `DESCRIPTION:${icsText(omschrijving(a))}`,
     'END:VEVENT',
@@ -168,7 +250,9 @@ export function icsBestand(a: Afspraak, now: Date = new Date()): string {
 
 /** De tekst voor het deelmenu van de telefoon, bijv. voor Google Tasks. */
 export function deelTekst(a: Afspraak): string {
-  return `${a.titel}, ${formatWanneer(a.wanneer)}`
+  return a.jaarlijks
+    ? `${a.titel}, elk jaar op ${formatWanneer(a.wanneer, undefined, true)}`
+    : `${a.titel}, ${formatWanneer(a.wanneer)}`
 }
 
 /** Bestandsnaam van het agenda-bestand: alleen letters, cijfers en streepjes. */
@@ -217,4 +301,55 @@ export async function zetInAgenda(agenda: Agenda, a: Afspraak): Promise<boolean>
       }
     }
   }
+}
+
+/** "2026-11-25" als "25-11-2026", zoals je een datum typt (F33); zonder jaar "25-11" (F44). */
+export function datumTekst(datum: string, zonderJaar = false): string {
+  const [y, m, d] = datum.split('-')
+  return zonderJaar ? `${d}-${m}` : `${d}-${m}-${y}`
+}
+
+/** Een getypte dag en maand zonder jaar (F44): zoals `leesDatum`, en 29-02 kan ook (in een schrikkeljaar). */
+export function leesDagMaand(tekst: string, now: Date = new Date()): string | null {
+  return leesDatum(tekst, now) ?? leesDatum(tekst, new Date(2000, 0, 1))
+}
+
+/**
+ * Een getypte datum als "2026-11-25" (F33): dag-maand-jaar met -, /, . of een spatie ertussen ("25-11-2026",
+ * "25/11/26", "25 11"), of alleen cijfers ("25112026", "2511"). Zonder jaar het huidige jaar. Leeg geeft "",
+ * een onbekende datum `null`.
+ */
+export function leesDatum(tekst: string, now: Date = new Date()): string | null {
+  const t = tekst.trim()
+  if (!t) return ''
+  let d: string, m: string, y: string | undefined
+  const delen = t.split(/[-/.\s]+/)
+  if (delen.length >= 2 && delen.length <= 3 && delen.every((x) => /^\d+$/.test(x))) {
+    ;[d, m, y] = delen
+  } else if (/^\d{4}(\d{2}|\d{4})?$/.test(t)) {
+    d = t.slice(0, 2)
+    m = t.slice(2, 4)
+    y = t.length > 4 ? t.slice(4) : undefined
+  } else return null
+  let jaar = y === undefined ? now.getFullYear() : Number(y)
+  if (y !== undefined && y.length <= 2) jaar += 2000
+  if (y !== undefined && y.length !== 2 && y.length !== 4) return null
+  const datum = `${jaar}-${pad(Number(m))}-${pad(Number(d))}`
+  return isMoment(datum) ? datum : null
+}
+
+/** Een getypte tijd als "09:30" (F33): "9:30", "9.30", "930", "0930" of "9". Leeg geeft "", onbekend `null`. */
+export function leesTijd(tekst: string): string | null {
+  const t = tekst.trim()
+  if (!t) return ''
+  let h: number, min: number
+  const m = /^(\d{1,2})(?:[:.\s](\d{2}))?$/.exec(t)
+  if (m) {
+    h = Number(m[1])
+    min = m[2] ? Number(m[2]) : 0
+  } else if (/^\d{3,4}$/.test(t)) {
+    h = Number(t.slice(0, t.length - 2))
+    min = Number(t.slice(-2))
+  } else return null
+  return h < 24 && min < 60 ? `${pad(h)}:${pad(min)}` : null
 }

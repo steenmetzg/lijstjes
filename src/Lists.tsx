@@ -1,7 +1,5 @@
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import {
-  Bell,
-  BellOff,
   GripVertical,
   Info as InfoIcon,
   Mic,
@@ -45,9 +43,6 @@ interface Props {
   notice: Notice | null
   onCloseNotice: () => void
   mic: { show: boolean; listening: boolean; start: () => void; stop: () => void }
-  /** Het belletje bij Nieuw lijstje staat aan: het nieuwe lijstje wordt een herinneringslijstje (F32). */
-  nieuwHerinnering: boolean
-  onToggleHerinnering: () => void
   /** De melding met herinneringen (F36). */
   reminders?: ReactNode
 }
@@ -67,6 +62,8 @@ interface RowProps {
   onStopEdit: () => void
   onError: (error: string | null) => void
   onDelete: () => void
+  /** De foutmelding bij het wijzigen van de naam, direct onder de regel (F11). */
+  fout: ReactNode
 }
 
 /**
@@ -88,6 +85,7 @@ function ListRow({
   onStopEdit,
   onError,
   onDelete,
+  fout,
 }: RowProps) {
   const [naam, setNaam] = useState(lijstje.naam)
   const open = openCount(lijstje)
@@ -156,12 +154,6 @@ function ListRow({
           aria-current={current ? 'true' : undefined}
           onClick={onOpen}
         >
-          {lijstje.herinnering ? (
-            <Bell className="list-bell" size={15} strokeWidth={2} aria-label="Herinneringslijstje" />
-          ) : (
-            // Grijs en zonder actie: een herinneringslijstje maak je op het lijstje zelf (F38).
-            <BellOff className="list-bell off" size={15} strokeWidth={2} aria-hidden />
-          )}
           <span className="list-name">{lijstje.naam}</span>
           {open > 0 && (
             <span className="count" aria-hidden>
@@ -190,6 +182,7 @@ function ListRow({
       >
         <Trash2 size={18} strokeWidth={1.75} aria-hidden />
       </button>
+      {fout}
     </li>
   )
 }
@@ -211,8 +204,6 @@ export default function Lists({
   notice,
   onCloseNotice,
   mic,
-  nieuwHerinnering,
-  onToggleHerinnering,
   reminders,
 }: Props) {
   const [naam, setNaam] = useState('')
@@ -266,8 +257,23 @@ export default function Lists({
     onCreate(naam.trim())
   }
 
+  // Een korte foutmelding staat direct onder het veld waarin je typt, niet onderaan het scherm (F5, F10, F11).
+  const korteFout = notice?.kind === 'error' && !notice.vast ? notice.text : null
+  const fout = error ?? korteFout
+  const foutRegel = fout && (
+    <p className="invoer-fout" role={error ? 'alert' : 'status'}>
+      {fout}
+    </p>
+  )
+  const onderaan = korteFout ? null : notice
+
   return (
-    <main className="app lists-screen">
+    <main
+      className="app lists-screen"
+      onInput={() => {
+        if (korteFout) onCloseNotice()
+      }}
+    >
       <header ref={header} className="main-header">
         <h1>Mijn lijstjes</h1>
         <div className="header-actions">
@@ -308,6 +314,7 @@ export default function Lists({
             onStopEdit={() => setEditing(null)}
             onError={setError}
             onDelete={() => askRemove(l)}
+            fout={editing === l.id && foutRegel}
           />
         ))}
         {/* De invoerregel voor een nieuw lijstje staat als laatste regel, zoals bij items (F10). */}
@@ -317,23 +324,12 @@ export default function Lists({
           style={{ bottom: scroll.bottomHeight }}
         >
           <MoreBelow count={hidden.below} words={['lijstje', 'lijstjes']} onClick={() => scroll.scrollPage(1)} />
-          {/* Het belletje staat links, op de plek van de greep (F32). */}
-          <span className="item-grip bell-slot">
-            <button
-              type="button"
-              className={nieuwHerinnering ? 'icon-button bell on' : 'icon-button bell'}
-              aria-label="Herinneringslijstje"
-              aria-pressed={nieuwHerinnering}
-              onClick={onToggleHerinnering}
-            >
-              <Bell size={15} strokeWidth={2} aria-hidden />
-            </button>
-          </span>
+          <span className="item-grip" aria-hidden />
           <form className="add-item" onSubmit={create}>
             <input
               type="text"
               aria-label="Naam van het nieuwe lijstje"
-              placeholder={nieuwHerinnering ? 'Nieuw herinneringslijstje' : 'Nieuw lijstje'}
+              placeholder="Nieuw lijstje"
               enterKeyHint="go"
               autoComplete="off"
               maxLength={MAX_NAAM}
@@ -350,12 +346,21 @@ export default function Lists({
                 className={mic.listening ? 'icon-button mic listening' : 'icon-button mic'}
                 aria-label={mic.listening ? 'Stoppen met luisteren' : 'Naam inspreken'}
                 aria-pressed={mic.listening}
-                onClick={mic.listening ? mic.stop : mic.start}
+                onClick={() => {
+                  // Inspreken haalt de melding bij wat je typte weg (AC43).
+                  if (mic.listening) mic.stop()
+                  else {
+                    if (korteFout) onCloseNotice()
+                    setError(null)
+                    mic.start()
+                  }
+                }}
               >
                 <Mic size={16} strokeWidth={2} aria-hidden />
               </button>
             )}
           </form>
+          {editing === null && foutRegel}
         </li>
       </ul>
 
@@ -377,20 +382,14 @@ export default function Lists({
             </p>
           </section>
         ) : (
-          notice && (
-            <section className={notice.kind === 'error' ? 'voice error' : 'voice'} aria-live="polite">
-              <p role="status">{notice.text}</p>
+          onderaan && (
+            <section className={onderaan.kind === 'error' ? 'voice error' : 'voice'} aria-live="polite">
+              <p role="status">{onderaan.text}</p>
               <button type="button" className="voice-close" aria-label="Melding sluiten" onClick={onCloseNotice}>
                 <X size={18} strokeWidth={1.75} aria-hidden />
               </button>
             </section>
           )
-        )}
-        {error && (
-          // Net als de meldingen op een lijstje (F5): onderaan, wit met een streep links.
-          <section className="voice error">
-            <p role="alert">{error}</p>
-          </section>
         )}
         {install.show && !install.ios && (
           <section className="install" aria-label="App installeren">
@@ -409,8 +408,8 @@ export default function Lists({
             {installHow ? (
               <>
                 <p>
-                  Tik op de Deel-knop <Share size={16} strokeWidth={2} aria-label="(vierkantje met pijl omhoog)" />{' '}
-                  (in Safari soms eerst op ⋯) en kies <strong>Zet op beginscherm</strong>.
+                  Tik op de Deel-knop <Share size={16} strokeWidth={2} aria-label="(vierkantje met pijl omhoog)" /> (in
+                  Safari soms eerst op ⋯) en kies <strong>Zet op beginscherm</strong>.
                 </p>
                 <button type="button" className="install-now" onClick={install.notNow}>
                   Oké

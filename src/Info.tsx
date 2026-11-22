@@ -29,9 +29,18 @@ export default function Info({ onClose }: Props) {
       <section className="setting info">
         <h2>Mijn lijstjes</h2>
         <p>
-          Je kunt zoveel lijstjes bijhouden als je wilt, elk met een eigen naam. Ook de volgorde van je lijstjes bepaal je zelf. Lijstjes onthoudt welk lijstje je het
-          laatst gebruikte en opent dat meteen. Een lijstje kun je helemaal verwijderen of je verwijdert alleen de
-          afgevinkte items.
+          Je kunt zoveel lijstjes bijhouden als je wilt, elk met een eigen naam. Ook de volgorde van je lijstjes bepaal
+          je zelf. Lijstjes onthoudt welk lijstje je het laatst gebruikte en opent dat meteen. Een lijstje gooi je weg
+          op Mijn lijstjes. In een lijstje gooi je met één tik alle afgevinkte items weg, of alle items.
+        </p>
+      </section>
+
+      <section className="setting info">
+        <h2>Kenmerken</h2>
+        <p>
+          Je kan zelf bepalen welke informatie je wilt bijhouden in een lijstje. Kies voor Datum, Tijd, Datum zonder
+          jaar, Aantal en Notities. Met een datum staan de items op datum, kun je ze in je agenda zetten en zie je bij
+          het openen een herinnering als het zover is.
         </p>
       </section>
 

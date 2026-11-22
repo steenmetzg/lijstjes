@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Info from './Info'
 import { useInstallPrompt } from './installPrompt'
 import Lists, { type Deleted } from './Lists'
@@ -13,13 +13,24 @@ import {
   nameError,
   moveItem,
   newId,
+  heeftTijd,
+  heeftZonderJaar,
   saveCurrent,
   saveLijstjes,
-  setWanneer,
+  capitalize,
+  MAX_TEKST,
+  sameText,
+  setDetails,
+  splitAantal,
   splitTyped,
+  staatInAgenda,
+  type Details,
+  type Kenmerken,
   type Lijstje,
 } from './lists'
-import { PER_ITEM, zetInAgenda, type AgendaKeuze } from './agenda'
+import { isAgenda, PER_ITEM, volgendeKeer, zetInAgenda, zichtbaar, type AgendaKeuze } from './agenda'
+import NewVersion from './NewVersion'
+import { markVersionSeen, versionToAnnounce } from './newVersion'
 import Reminders from './Reminders'
 import { dueItems } from './reminders'
 import Settings from './Settings'
@@ -33,17 +44,23 @@ export default function App() {
   // Het laatst geopende lijstje; `null` zolang er nog nooit een lijstje is geopend.
   const [huidig, setHuidig] = useState<string | null>(() => loadCurrent(lijstjes))
   // De app start met het laatst gebruikte lijstje, of met Mijn lijstjes als er nog geen is (F1).
-  const [screen, setScreen] = useState<'lijst' | 'lijstjes' | 'settings' | 'info'>(() => (huidig ? 'lijst' : 'lijstjes'))
+  const [screen, setScreen] = useState<'lijst' | 'lijstjes' | 'settings' | 'info'>(() =>
+    huidig ? 'lijst' : 'lijstjes',
+  )
   const [notice, setNotice] = useState<Notice | null>(null)
-  // Een lijstje dat vanuit dat lijstje zelf is weggegooid; Mijn lijstjes toont dan Ongedaan maken (F8, F12).
+  // Een lijstje dat op Mijn lijstjes is weggegooid; Mijn lijstjes toont dan Ongedaan maken (F12).
   const [justDeleted, setJustDeleted] = useState<Deleted | null>(null)
   const [speechEnabled, setSpeechEnabled] = useState(loadSpeechEnabled)
-  // Het belletje bij Nieuw lijstje: het volgende lijstje wordt een herinneringslijstje (F32).
-  const [nieuwHerinnering, setNieuwHerinnering] = useState(false)
   const installPrompt = useInstallPrompt()
+  // Inspreken in het vak van een item: wat je zegt, komt in het veld Omschr (F46).
+  const dicteer = useRef<((gezegd: string) => void) | null>(null)
   const speech = useSpeech(
     // Op Mijn lijstjes is wat je zegt de naam van een nieuw lijstje (F31), op een lijstje zijn het items (F15).
-    (alternatives) => (screen === 'lijstjes' ? createSpoken(spokenName(alternatives)) : addTexts(bestSpoken(alternatives), true)),
+    (alternatives) => {
+      if (dicteer.current) dicteer.current(alternatives[0] ?? '')
+      else if (screen === 'lijstjes') createSpoken(spokenName(alternatives))
+      else addTexts(bestSpoken(alternatives), true)
+    },
     (text) => setNotice({ kind: 'error', text }),
   )
   const lijstje = lijstjes.find((l) => l.id === huidig) ?? lijstjes[0]
@@ -59,7 +76,13 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  const reminders =
+  // Melding na het bijwerken van de app, tot je hem sluit (F45).
+  const [newVersion, setNewVersion] = useState(() => versionToAnnounce(__APP_VERSION__))
+  useEffect(() => {
+    if (newVersion === null) markVersionSeen(__APP_VERSION__)
+  }, [newVersion])
+
+  const dueMelding =
     due.length > 0 ? (
       <Reminders
         due={due}
@@ -74,6 +97,15 @@ export default function App() {
       />
     ) : null
 
+  // Onderaan het scherm: eerst de melding van een nieuwe versie, dan de herinneringen.
+  const reminders =
+    newVersion || dueMelding ? (
+      <>
+        {newVersion && <NewVersion version={newVersion} onClose={() => setNewVersion(null)} />}
+        {dueMelding}
+      </>
+    ) : null
+
   useEffect(() => saveLijstjes(lijstjes), [lijstjes])
   useEffect(() => {
     if (huidig) saveCurrent(huidig)
@@ -81,7 +113,8 @@ export default function App() {
   useEffect(() => saveSpeechEnabled(speechEnabled), [speechEnabled])
 
   useEffect(() => {
-    if (!notice || notice.vast) return
+    // Een melding bij wat je typte blijft staan tot je weer typt of inspreekt (AC43).
+    if (!notice || notice.vast || notice.bijInvoer || notice.kind === 'error') return
     const timer = setTimeout(() => setNotice(null), NOTICE_MS)
     return () => clearTimeout(timer)
   }, [notice])
@@ -98,7 +131,10 @@ export default function App() {
     const result = addItems(lijstje, texts)
     update(lijstje.id, () => result.lijstje)
     const text = addMessage(result, spoken)
-    setNotice(text ? { kind: 'ok', text } : null)
+    // Getypt: de melding staat direct onder de invoerregel (AC43).
+    // Staat er iets al op, dan is het een (rode) foutmelding.
+    const kind = !spoken && result.already.length > 0 ? 'error' : 'ok'
+    setNotice(text ? { kind, text, ...(!spoken && { bijInvoer: true }) } : null)
   }
 
   function openList(id: string) {
@@ -110,8 +146,8 @@ export default function App() {
 
   function create(naam: string) {
     const id = newId()
-    setLijstjes((all) => [...all, { id, naam, items: [], ...(nieuwHerinnering && { herinnering: true }) }])
-    setNieuwHerinnering(false)
+    // Een nieuw lijstje is altijd een gewoon lijstje; kenmerken kies je daarna met de schuifjesknop (F10, F41).
+    setLijstjes((all) => [...all, { id, naam, items: [] }])
     openList(id)
   }
 
@@ -143,37 +179,153 @@ export default function App() {
     if (wasCurrent) setHuidig(back.id)
   }
 
-  /** Een andere datum of tijd; stond het item al in de agenda, dan moet je dat oude agenda-item zelf weghalen (F35). */
-  function changeWhen(id: string, wanneer: string | null) {
+  /**
+   * Bewaart tekst en kenmerken van een item (F42). Stond het item met de oude datum in de agenda, dan moet je dat
+   * agenda-item zelf weghalen (F35).
+   */
+  function saveDetails(id: string, tekst: string, details: Details): boolean {
     const item = lijstje.items.find((i) => i.id === id)
-    update(lijstje.id, (l) => setWanneer(l, id, wanneer))
-    if (item?.inAgenda && item.inAgenda !== wanneer) {
+    if (!item) return true
+    const tijd = heeftTijd(lijstje)
+    let next = setDetails(lijstje, id, details)
+    let error: string | null = null
+    if (tekst.trim() !== item.tekst) {
+      const result = editItem(next, id, tekst)
+      // Staat de nieuwe tekst al als ander item op het lijstje, dan blijft het vak open met de melding (AC43).
+      if (result.error) {
+        setNotice({ kind: 'error', text: result.error })
+        return false
+      }
+      next = result.lijstje
+      error = result.error
+    }
+    update(lijstje.id, () => next)
+    const nieuw = next.items.find((i) => i.id === id)
+    if (staatInAgenda(item, tijd) && nieuw && !staatInAgenda(nieuw, tijd)) {
       setNotice({
         kind: 'error',
         vast: true,
-        text: `${item.tekst} staat nog met de oude datum en tijd in je agenda. Verwijder dat agenda-item zelf.`,
+        text: `${nieuw.tekst} staat nog met de oude datum${tijd ? ' en tijd' : ''} in je agenda. Verwijder dat agenda-item zelf.`,
       })
+    } else {
+      setNotice(error ? { kind: 'error', text: error } : null)
     }
+    return true
   }
 
-  /** Kiest de agenda van het lijstje en zet zo nodig een item erin (F34). */
-  function agenda(keuze: AgendaKeuze | null, itemId: string | null, nieuweDatum?: string) {
+  /**
+   * Een nieuw item uit het vak Nieuw item, met zijn kenmerken (F42). Met Aantal en een leeg aantal wordt een getal
+   * vooraan het aantal (F43). Staat het item er al, dan blijft het vak open met de melding (F5).
+   */
+  function addWithDetails(tekst: string, details: Details): { id: string; tekst: string } | null {
+    const t = tekst.trim().slice(0, MAX_TEKST).trim()
+    if (!t) {
+      setNotice({ kind: 'error', text: 'Typ eerst wat het item is.' })
+      return null
+    }
+    const split =
+      lijstje.kenmerken?.aantal && !details.aantal?.trim() ? splitAantal(t) : { tekst: t, aantal: details.aantal }
+    const bestaand = lijstje.items.find((i) => sameText(i.tekst, split.tekst))
+    if (bestaand) {
+      setNotice({ kind: 'error', text: `${capitalize(bestaand.tekst)} staat er al op.` })
+      return null
+    }
+    const id = newId()
+    const next = setDetails({ ...lijstje, items: [...lijstje.items, { id, tekst: split.tekst, af: false }] }, id, {
+      ...details,
+      aantal: split.aantal,
+    })
+    update(lijstje.id, () => next)
+    setNotice(null)
+    return { id, tekst: split.tekst }
+  }
+
+  /** Nieuwe naam en kenmerken van het huidige lijstje; `false` als de naam niet kan (F37, F41). */
+  function instellen(naam: string, kenmerken: Kenmerken): boolean {
     const l = lijstje
+    const anders = naam.trim() !== l.naam
+    const problem = anders ? nameError(lijstjes, naam, l.id) : null
+    if (problem) {
+      setNotice({ kind: 'error', text: problem })
+      return false
+    }
+    const aan: Kenmerken = Object.fromEntries(
+      Object.entries(kenmerken)
+        .filter(([, v]) => v)
+        .map(([k]) => [k, true]),
+    )
+    update(l.id, (x) => {
+      const { kenmerken: _oud, ...rest } = x
+      return { ...rest, naam: anders ? naam.trim() : x.naam, ...(Object.keys(aan).length > 0 && { kenmerken: aan }) }
+    })
+    // Een kenmerk uitzetten verbergt de ingevulde waarden, maar gooit ze niet weg (F41).
+    const oud = l.kenmerken ?? {}
+    const verborgen = (
+      [
+        ['datum', l.items.some((i) => i.wanneer)],
+        ['tijd', l.items.some((i) => i.wanneer && i.wanneer.length > 10)],
+        ['notitie', l.items.some((i) => i.notitie)],
+        ['aantal', l.items.some((i) => i.aantal)],
+      ] as const
+    ).some(([k, gevuld]) => gevuld && oud[k] && !aan[k] && !(k === 'tijd' && !oud.datum))
+    if (verborgen) {
+      const inAgenda = oud.datum && !aan.datum ? l.items.filter((i) => i.inAgenda).length : 0
+      const agendaTekst =
+        inAgenda === 0
+          ? ''
+          : ` ${inAgenda === 1 ? '1 item staat' : `${inAgenda} items staan`} nog in je agenda; verwijder ${inAgenda === 1 ? 'het' : 'ze'} daar zelf als je ${inAgenda === 1 ? 'het' : 'ze'} niet meer nodig hebt.`
+      setNotice({
+        kind: 'ok',
+        text: `Wat je bij de uitgezette kenmerken had ingevuld, blijft bewaard en komt terug als je ze weer aanzet.${agendaTekst}`,
+        ...(inAgenda > 0 && { vast: true }),
+      })
+    } else {
+      setNotice(null)
+    }
+    return true
+  }
+
+  /**
+   * Kiest de agenda van het lijstje en zet zo nodig een item erin (F34), met de datum (en tijd) die je ziet: zonder
+   * tijd als het kenmerk Tijd uit staat (dan een agenda-item voor de hele dag).
+   */
+  function agenda(keuze: AgendaKeuze | null, itemId: string | null, nieuweDatum?: string, nieuweTitel?: string) {
+    const l = lijstje
+    const tijd = heeftTijd(l)
     // Bij Per item kiezen blijft dat de keuze van het lijstje; de agenda geldt alleen voor dit item (F34).
     const voorLijstje = !(itemId && l.agenda === PER_ITEM)
     if (keuze && keuze !== l.agenda && voorLijstje) update(l.id, (x) => ({ ...x, agenda: keuze }))
     const item = l.items.find((i) => i.id === itemId)
     const welke = keuze ?? l.agenda
-    if (welke === PER_ITEM) return
-    // Net bewaard in het vak met datum en tijd: die datum, ook al staat hij nog niet in `lijstje`.
-    const wanneer = nieuweDatum ?? item?.wanneer
-    if (!item || !wanneer || !welke) return
+    if (!welke || !isAgenda(welke)) return
+    // Net bewaard in het vak met de kenmerken: die datum, ook al staat hij nog niet in `lijstje`.
+    const wanneer = nieuweDatum ?? (item?.wanneer && zichtbaar(item.wanneer, tijd))
+    // Een net gemaakt of gewijzigd item staat nog niet (zo) in `lijstje`: dan de tekst uit het vak.
+    const titel = nieuweTitel ?? item?.tekst
+    if (!itemId || !wanneer || !titel) return
     // Niet wachten vóór het openen: anders houdt de browser het nieuwe venster tegen.
-    void zetInAgenda(welke, { id: item.id, titel: item.tekst, lijstje: l.naam, wanneer }).then((ok) => {
+    // Zonder jaar: de eerstvolgende keer, en elk jaar terug (F44).
+    const jaarlijks = heeftZonderJaar(l)
+    const afspraak = {
+      id: itemId,
+      titel,
+      lijstje: l.naam,
+      wanneer: jaarlijks ? volgendeKeer(wanneer) : wanneer,
+      jaarlijks,
+    }
+    void zetInAgenda(welke, afspraak).then((ok) => {
       if (ok) {
-        update(l.id, (x) => ({ ...x, items: x.items.map((i) => (i.id === item.id && i.wanneer === wanneer ? { ...i, inAgenda: wanneer } : i)) }))
+        update(l.id, (x) => ({
+          ...x,
+          items: x.items.map((i) =>
+            i.id === itemId && i.wanneer && zichtbaar(i.wanneer, tijd) === wanneer ? { ...i, inAgenda: wanneer } : i,
+          ),
+        }))
       } else if (welke === 'delen' && typeof navigator.share !== 'function') {
-        setNotice({ kind: 'error', text: 'Delen kan niet op deze telefoon. Kies een andere agenda met het belletje.' })
+        setNotice({
+          kind: 'error',
+          text: 'Delen kan niet op deze telefoon. Kies een andere agenda met de schuifjesknop bovenaan het lijstje.',
+        })
       }
     })
   }
@@ -220,17 +372,16 @@ export default function App() {
         notice={notice}
         onCloseNotice={() => setNotice(null)}
         reminders={reminders}
-        nieuwHerinnering={nieuwHerinnering}
-        onToggleHerinnering={() => setNieuwHerinnering(!nieuwHerinnering)}
-      mic={{
-        show: speechEnabled && speechSupported(),
-        listening: speech.listening,
-        start: () => {
-          setNotice(null)
-          speech.start()
-        },
-        stop: speech.stop,
-      }}
+        mic={{
+          show: speechEnabled && speechSupported(),
+          listening: speech.listening,
+          start: () => {
+            setNotice(null)
+            dicteer.current = null
+            speech.start()
+          },
+          stop: speech.stop,
+        }}
       />
     )
   }
@@ -243,66 +394,37 @@ export default function App() {
       notice={notice}
       onCloseNotice={() => setNotice(null)}
       onAdd={(text) => addTexts(splitTyped(text), false)}
-      onToggle={(id) => update(lijstje.id, (l) => ({ ...l, items: l.items.map((i) => (i.id === id ? { ...i, af: !i.af } : i)) }))}
+      onToggle={(id) =>
+        update(lijstje.id, (l) => ({ ...l, items: l.items.map((i) => (i.id === id ? { ...i, af: !i.af } : i)) }))
+      }
       onEdit={(id, text) => {
         const result = editItem(lijstje, id, text)
         update(lijstje.id, () => result.lijstje)
-        setNotice(result.error ? { kind: 'error', text: result.error } : null)
+        // De melding staat onder het item dat je aanpaste (AC43).
+        setNotice(result.error ? { kind: 'error', text: result.error, itemId: id } : null)
+        return !result.error
       }}
       onMove={(from, to) => update(lijstje.id, (l) => moveItem(l, from, to))}
       onRemove={(id) => update(lijstje.id, (l) => ({ ...l, items: l.items.filter((i) => i.id !== id) }))}
       onClear={(which) =>
         update(lijstje.id, (l) => ({ ...l, items: which === 'alles' ? [] : l.items.filter((i) => !i.af) }))
       }
-      onDeleteList={
-        lijstjes.length > 1
-          ? () => {
-              setNotice(null)
-              setJustDeleted(remove(lijstje.id))
-              setScreen('lijstjes')
-            }
-          : null
-      }
       onBack={() => {
         setNotice(null)
         setScreen('lijstjes')
       }}
       reminders={reminders}
-      onRename={(naam) => {
-        const problem = nameError(lijstjes, naam, lijstje.id)
-        if (problem) {
-          setNotice({ kind: 'error', text: problem })
-          return false
-        }
-        update(lijstje.id, (l) => ({ ...l, naam: naam.trim() }))
-        setNotice(null)
-        return true
-      }}
-      onHerinnering={(aan) => {
-        update(lijstje.id, (l) => ({ ...l, herinnering: aan }))
-        if (aan) {
-          setNotice({ kind: 'ok', text: `${lijstje.naam} is nu een herinneringslijstje. Kies een datum met het agenda-knopje.` })
-          return
-        }
-        // De datums blijven bewaard, voor als de herinnering weer aangaat; agenda-items blijven in de agenda (F38).
-        const inAgenda = lijstje.items.filter((i) => i.inAgenda).length
-        const agendaTekst =
-          inAgenda === 0
-            ? ''
-            : ` ${inAgenda === 1 ? '1 item staat' : `${inAgenda} items staan`} nog in je agenda; verwijder ${inAgenda === 1 ? 'het' : 'ze'} daar zelf als je ${inAgenda === 1 ? 'het' : 'ze'} niet meer nodig hebt.`
-        setNotice({
-          kind: 'ok',
-          text: `${lijstje.naam} is weer een gewoon lijstje. De datums blijven bewaard en komen terug als je de herinnering weer aanzet.${agendaTekst}`,
-          ...(inAgenda > 0 && { vast: true }),
-        })
-      }}
-      onWhen={changeWhen}
+      onInstellen={instellen}
+      onDetails={saveDetails}
+      onAddDetails={addWithDetails}
+      onFout={(text, veld) => setNotice({ kind: 'error', text, ...(veld && { veld }) })}
       onAgenda={agenda}
       mic={{
         show: speechEnabled && speechSupported(),
         listening: speech.listening,
-        start: () => {
+        start: (inVak) => {
           setNotice(null)
+          dicteer.current = inVak ?? null
           speech.start()
         },
         stop: speech.stop,

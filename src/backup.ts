@@ -1,4 +1,14 @@
-import { basisLijstjes, itemsText, mergeHerinneringen, parseLijstjes, splitHerinneringen, type Herinneringen, type Lijstje } from './lists'
+import {
+  basisLijstjes,
+  itemsText,
+  mergeHerinneringen,
+  parseLijstjes,
+  splitHerinneringen,
+  splitKenmerken,
+  type Herinneringen,
+  type KenmerkenOpslag,
+  type Lijstje,
+} from './lists'
 
 const APP_ID = 'lijstjes'
 
@@ -11,6 +21,8 @@ export interface Backup {
   huidig: string
   /** Herinneringslijstjes (F32): apart, zodat een oudere versie de backup ook kan terugzetten (§8). */
   herinneringen?: Herinneringen
+  /** Kenmerken van de lijstjes en de waarden van de items (vanaf versie 1.7, §8). */
+  kenmerken?: KenmerkenOpslag
 }
 
 function dateKey(date: Date): string {
@@ -31,6 +43,7 @@ export function createBackup(lijstjes: Lijstje[], huidig: string, now: Date): st
     lijstjes: basisLijstjes(lijstjes),
     huidig,
     herinneringen: splitHerinneringen(lijstjes),
+    kenmerken: splitKenmerken(lijstjes),
   }
   return JSON.stringify(backup, null, 2)
 }
@@ -54,7 +67,7 @@ export function parseBackup(text: string): { gemaakt: Date | null; lijstjes: Lij
   if (backup.versie !== 1) throw new Error('Deze backup is gemaakt met een onbekende versie van de app.')
   const basis = parseLijstjes(backup.lijstjes)
   if (!basis) throw new Error('Deze backup is beschadigd.')
-  const lijstjes = mergeHerinneringen(basis, backup.herinneringen)
+  const lijstjes = mergeHerinneringen(basis, backup.herinneringen, backup.kenmerken)
   const gemaakt = backup.gemaakt ? new Date(backup.gemaakt) : null
   const huidig = typeof backup.huidig === 'string' && lijstjes.some((l) => l.id === backup.huidig) ? backup.huidig : lijstjes[0].id
   return { gemaakt: gemaakt && !isNaN(gemaakt.getTime()) ? gemaakt : null, lijstjes, huidig }

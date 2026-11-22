@@ -42,7 +42,10 @@ interface Recognition {
 type RecognitionConstructor = new () => Recognition
 
 function recognitionConstructor(): RecognitionConstructor | null {
-  const w = window as unknown as { SpeechRecognition?: RecognitionConstructor; webkitSpeechRecognition?: RecognitionConstructor }
+  const w = window as unknown as {
+    SpeechRecognition?: RecognitionConstructor
+    webkitSpeechRecognition?: RecognitionConstructor
+  }
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
@@ -84,8 +87,23 @@ export function saveSpeechEnabled(on: boolean): void {
  * aan het eind en met een hoofdletter, zoals "Verjaardag Anne".
  */
 export function spokenName(alternatives: string[]): string {
-  const text = (alternatives[0] ?? '').trim().replace(/[.!?]+$/, '').trim()
+  const text = (alternatives[0] ?? '')
+    .trim()
+    .replace(/[.!?]+$/, '')
+    .trim()
   return (text.charAt(0).toLocaleUpperCase('nl') + text.slice(1)).slice(0, MAX_NAAM).trim()
+}
+
+/**
+ * Wat je in het vak van een item inspreekt: in zijn geheel de omschrijving, ook met "komma", zonder punt aan het eind
+ * en met een kleine letter, zoals een ingesproken item (F46).
+ */
+export function spokenTekst(alternatives: string[]): string {
+  const text = (alternatives[0] ?? '')
+    .trim()
+    .replace(/[.!?]+$/, '')
+    .trim()
+  return (text.charAt(0).toLocaleLowerCase('nl') + text.slice(1)).slice(0, MAX_TEKST).trim()
 }
 
 /**
@@ -130,7 +148,8 @@ export function useSpeech(onHeard: (alternatives: string[]) => void, onError: (m
       if (alternatives.length > 0) handlers.current.onHeard(alternatives)
     }
     r.onerror = (event) => {
-      if (event.error !== 'aborted') handlers.current.onError(ERRORS[event.error] ?? 'Spraakherkenning lukte niet. Probeer het opnieuw.')
+      if (event.error !== 'aborted')
+        handlers.current.onError(ERRORS[event.error] ?? 'Spraakherkenning lukte niet. Probeer het opnieuw.')
     }
     r.onend = () => {
       recognition.current = null

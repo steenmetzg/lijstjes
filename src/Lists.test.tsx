@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -101,16 +101,25 @@ describe('AC4: dubbel item', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Melk staat er al op.')
   })
 
-  it('laat de melding na 5 seconden verdwijnen', async () => {
+  it('toont de melding direct onder de invoerregel, niet onderaan het scherm (AC43)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await typeItem(user, 'melk')
+    await typeItem(user, 'melk')
+    expect(screen.getByRole('status').closest('li')).toHaveClass('add-row')
+  })
+
+  it('laat de melding staan tot je weer typt of de microfoon gebruikt (AC43)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<App />)
     await typeItem(user, 'melk')
     await typeItem(user, 'melk')
-    expect(screen.getByRole('status')).toBeInTheDocument()
     act(() => {
-      vi.advanceTimersByTime(5000)
+      vi.advanceTimersByTime(60000)
     })
+    expect(screen.getByRole('status')).toHaveTextContent('Melk staat er al op.')
+    await user.type(screen.getByRole('textbox', { name: 'Item toevoegen' }), 'b')
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })
@@ -189,83 +198,49 @@ describe('AC6: item weggooien', () => {
   })
 })
 
-describe('AC7: lijstje of items weggooien', () => {
-  async function openClear(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole('button', { name: 'Lijstje weggooien' }))
-    return screen.getByRole('region', { name: 'Lijstje weggooien' })
-  }
-
-  it('Afgevinkte weggooien gooit alleen de afgevinkte items weg', async () => {
+describe('AC7: items weggooien', () => {
+  it('Afgevinkte items weggooien gooit meteen alleen de afgevinkte items weg', async () => {
     const user = userEvent.setup()
     render(<App />)
     await typeItem(user, 'melk, brood, kaas')
     await user.click(itemButton('brood'))
-    await user.click(within(await openClear(user)).getByRole('button', { name: 'Afgevinkte weggooien' }))
+    await user.click(screen.getByRole('button', { name: 'Afgevinkte items weggooien' }))
     expect(itemTexts()).toEqual(['melk', 'kaas'])
   })
 
-  it('Alle items weggooien gooit alles weg en het lijstje blijft bestaan', async () => {
+  it('Alle items weggooien gooit meteen alles weg en het lijstje blijft bestaan', async () => {
     const user = userEvent.setup()
     render(<App />)
     await typeItem(user, 'melk, brood')
-    await user.click(within(await openClear(user)).getByRole('button', { name: 'Alle items weggooien' }))
+    await user.click(screen.getByRole('button', { name: 'Alle items weggooien' }))
     expect(itemTexts()).toEqual([])
     expect(title()).toHaveTextContent('Mijn 1e lijstje')
   })
 
-  it('staat in de vaste titelbalk, zodat hij ook in beeld is als je omlaag gescrold bent', async () => {
-    const user = userEvent.setup()
+  it('staan in de vaste titelbalk, zodat ze ook in beeld zijn als je omlaag gescrold bent', async () => {
     render(<App />)
-    await typeItem(user, 'melk')
-    const choice = await openClear(user)
-    expect(choice.closest('header')).toHaveClass('list-header')
+    for (const name of ['Afgevinkte items weggooien', 'Alle items weggooien']) {
+      expect(screen.getByRole('button', { name }).closest('header')).toHaveClass('list-header')
+    }
   })
 
-  it('Items én het lijstje weggooien gooit het hele lijstje weg, gaat naar Mijn lijstjes en kan ongedaan worden', async () => {
+  it('maakt de knoppen inactief als er niets weg te gooien is', async () => {
     const user = userEvent.setup()
-    storeLists([list('a', 'AH', ['melk', ['brood', true]]), list('b', 'Klussen')], 'a')
     render(<App />)
-    await user.click(
-      within(await openClear(user)).getByRole('button', { name: 'Items én het lijstje weggooien' }),
-    )
-    expect(title()).toHaveTextContent('Mijn lijstjes')
-    expect(listNames()).toEqual(['Klussen'])
-    expect(screen.getByRole('status')).toHaveTextContent('Lijstje AH weggegooid')
-    await user.click(screen.getByRole('button', { name: 'Ongedaan maken' }))
-    expect(listNames()).toEqual(['AH', 'Klussen'])
-    expect(screen.getByRole('button', { name: 'AH, 1 open' })).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByRole('button', { name: 'Afgevinkte items weggooien' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Alle items weggooien' })).toBeDisabled()
+    await typeItem(user, 'melk')
+    expect(screen.getByRole('button', { name: 'Afgevinkte items weggooien' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Alle items weggooien' })).toBeEnabled()
+    await user.click(itemButton('melk'))
+    expect(screen.getByRole('button', { name: 'Afgevinkte items weggooien' })).toBeEnabled()
   })
 
-  it('kan het laatste lijstje niet weggooien, maar een leeg lijstje wel als er meer zijn', async () => {
-    const user = userEvent.setup()
+  it('heeft op een lijstje geen knop meer om het hele lijstje weg te gooien', async () => {
+    storeLists([list('a', 'AH', ['melk']), list('b', 'Klussen')], 'a')
     render(<App />)
-    await typeItem(user, 'melk')
-    expect(within(await openClear(user)).getByRole('button', { name: 'Items én het lijstje weggooien' })).toBeDisabled()
-    cleanup()
-    storeLists([list('l1', 'AH'), list('b', 'Klussen')], 'l1')
-    render(<App />)
-    expect(screen.getByRole('button', { name: 'Lijstje weggooien' })).toBeEnabled()
-    const choice = await openClear(user)
-    expect(within(choice).getByRole('button', { name: 'Alle items weggooien' })).toBeDisabled()
-    await user.click(within(choice).getByRole('button', { name: 'Items én het lijstje weggooien' }))
-    expect(listNames()).toEqual(['Klussen'])
-  })
-
-  it('Annuleren laat alles staan', async () => {
-    const user = userEvent.setup()
-    render(<App />)
-    await typeItem(user, 'melk')
-    await user.click(within(await openClear(user)).getByRole('button', { name: 'Annuleren' }))
-    expect(itemTexts()).toEqual(['melk'])
+    expect(screen.queryByRole('button', { name: /lijstje weggooien/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Lijstje weggooien' })).not.toBeInTheDocument()
-  })
-
-  it('maakt Afgevinkte weggooien inactief zonder afgevinkte items, en de prullenbak bij een leeg lijstje', async () => {
-    const user = userEvent.setup()
-    render(<App />)
-    expect(screen.getByRole('button', { name: 'Lijstje weggooien' })).toBeDisabled()
-    await typeItem(user, 'melk')
-    expect(within(await openClear(user)).getByRole('button', { name: 'Afgevinkte weggooien' })).toBeDisabled()
   })
 })
 
@@ -299,6 +274,8 @@ describe('AC8: lijstje maken', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Geef het lijstje een naam.')
     await user.type(field, ' ah {Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Er is al een lijstje AH.')
+    // Direct onder het veld voor een nieuw lijstje (AC43).
+    expect(screen.getByRole('alert').closest('li')).toHaveClass('add-row')
     expect(listNames()).toEqual(['AH', 'Klussen'])
   })
 
@@ -338,6 +315,8 @@ describe('AC9: naam wijzigen', () => {
     await user.clear(field)
     await user.type(field, 'klussen{Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Er is al een lijstje Klussen.')
+    // Direct onder de regel die je wijzigt (AC43).
+    expect(screen.getByRole('alert').closest('li')).toBe(field.closest('li'))
     await user.clear(field)
     await user.type(field, 'Jumbo{Enter}')
     await user.click(screen.getByRole('button', { name: 'Jumbo' }))
@@ -550,8 +529,12 @@ describe('AC20: item aanpassen', () => {
     await user.click(screen.getByRole('button', { name: 'melk aanpassen' }))
     await user.clear(screen.getByRole('textbox', { name: 'Item aanpassen' }))
     await user.keyboard('Brood{Enter}')
-    expect(itemTexts()).toEqual(['melk', 'brood'])
+    // Het veld blijft open, met de melding direct eronder (AC43).
+    const field = screen.getByRole('textbox', { name: 'Item aanpassen' })
     expect(screen.getByRole('status')).toHaveTextContent('Brood staat er al op.')
+    expect(screen.getByRole('status').closest('li')).toBe(field.closest('li'))
+    await user.keyboard('{Escape}')
+    expect(itemTexts()).toEqual(['melk', 'brood'])
   })
 
   it('laat afvinken met het rondje en weggooien met het kruisje gewoon werken', async () => {
@@ -759,7 +742,10 @@ describe('AC23: Mijn lijstjes werkt net als een lijstje', () => {
 
   it('toont een lipje met het aantal lijstjes boven en onder het scherm', async () => {
     const user = userEvent.setup()
-    storeLists(['a', 'b', 'c', 'd', 'e', 'f'].map((n) => list(n, n.toUpperCase())), 'a')
+    storeLists(
+      ['a', 'b', 'c', 'd', 'e', 'f'].map((n) => list(n, n.toUpperCase())),
+      'a',
+    )
     render(<App />)
     await openMyLists(user)
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
@@ -785,19 +771,21 @@ describe('AC23: Mijn lijstjes werkt net als een lijstje', () => {
 })
 
 describe('AC32: naam wijzigen op het lijstje zelf', () => {
-  it('tik op de titel maakt er een tekstveld van; Enter bewaart, ook met items', async () => {
+  it('tik op de titel opent het vak met de naam; Bewaren bewaart, ook met items', async () => {
     const user = userEvent.setup()
     storeLists([list('a', 'AH', ['melk', 'brood']), list('b', 'Klussen')], 'a')
     render(<App />)
-    await user.click(screen.getByRole('button', { name: 'Naam van AH wijzigen' }))
-    const field = screen.getByRole('textbox', { name: 'Nieuwe naam voor AH' })
+    await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van AH' }))
+    const field = screen.getByRole('textbox', { name: 'Naam van het lijstje' })
     expect(field).toHaveValue('AH')
     await user.clear(field)
     await user.type(field, 'klussen{Enter}')
     expect(screen.getByRole('status')).toHaveTextContent('Er is al een lijstje Klussen.')
-    expect(screen.getByRole('textbox', { name: 'Nieuwe naam voor AH' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Naam van het lijstje' })).toBeInTheDocument()
     await user.clear(field)
-    await user.type(field, 'Jumbo{Enter}')
+    await user.type(field, 'Jumbo')
+    await user.click(screen.getByRole('button', { name: 'Bewaren' }))
+    expect(screen.queryByRole('textbox', { name: 'Naam van het lijstje' })).not.toBeInTheDocument()
     expect(title()).toHaveTextContent('Jumbo')
     expect(itemTexts()).toEqual(['melk', 'brood'])
     const saved = JSON.parse(localStorage.getItem(LISTS_KEY)!)
@@ -805,15 +793,21 @@ describe('AC32: naam wijzigen op het lijstje zelf', () => {
     expect(saved[0].items).toHaveLength(2)
   })
 
-  it('Escape laat de oude naam staan', async () => {
+  it('Escape of Annuleren laat de oude naam staan', async () => {
     const user = userEvent.setup()
     storeLists([list('a', 'AH', ['melk'])], 'a')
     render(<App />)
-    await user.click(screen.getByRole('button', { name: 'Naam van AH wijzigen' }))
-    const field = screen.getByRole('textbox', { name: 'Nieuwe naam voor AH' })
+    await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van AH' }))
+    let field = screen.getByRole('textbox', { name: 'Naam van het lijstje' })
     await user.clear(field)
     await user.type(field, 'Jumbo{Escape}')
-    expect(screen.queryByRole('textbox', { name: 'Nieuwe naam voor AH' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Naam van het lijstje' })).not.toBeInTheDocument()
+    expect(title()).toHaveTextContent('AH')
+    await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van AH' }))
+    field = screen.getByRole('textbox', { name: 'Naam van het lijstje' })
+    await user.clear(field)
+    await user.type(field, 'Jumbo')
+    await user.click(screen.getByRole('button', { name: 'Annuleren' }))
     expect(title()).toHaveTextContent('AH')
   })
 })

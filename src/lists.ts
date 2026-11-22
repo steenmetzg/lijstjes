@@ -1,6 +1,6 @@
 // De lijstjes en hun items: de gegevens, bewaren en ophalen, en de regels voor toevoegen (F3 t/m F5).
 
-import { isAgendaKeuze, isWanneer, type AgendaKeuze } from './agenda'
+import { isAgendaKeuze, isMoment, isWanneer, momentGelijk, zichtbaar, type AgendaKeuze } from './agenda'
 import { KEY_PREFIX } from './storageKey'
 
 export interface Item {
@@ -8,23 +8,64 @@ export interface Item {
   tekst: string
   /** Afgevinkt (F6): doorgestreept, maar het item blijft op zijn plek staan. */
   af: boolean
-  /** Herinneringslijstje: datum en tijd, bijv. "2026-11-08T14:00" (F33). */
+  /**
+   * Kenmerk Datum (en Tijd): "2026-11-08" of met tijd "2026-11-08T14:00" (F33). Staat Tijd uit, dan blijft een
+   * eerder ingevulde tijd bewaard maar onzichtbaar.
+   */
   wanneer?: string
-  /** Herinneringslijstje: de datum en tijd waarmee het item in de agenda is gezet (F34, F35). */
+  /** De datum (en tijd) waarmee het item in de agenda is gezet (F34, F35). */
   inAgenda?: string
+  /** Kenmerk Notitie: een of meer regels extra tekst (F42). */
+  notitie?: string
+  /** Kenmerk Aantal: vrije tekst, bijv. "2" of "500 g" (F42). */
+  aantal?: string
 }
+
+/** De extra kenmerken die een lijstje per item kan hebben (F41). Tijd werkt alleen samen met Datum. */
+export interface Kenmerken {
+  datum?: boolean
+  /** Datum zonder jaar: dag en maand, elk jaar (F44). Alleen samen met Datum. */
+  zonderJaar?: boolean
+  tijd?: boolean
+  notitie?: boolean
+  aantal?: boolean
+}
+
+export const KENMERKEN: readonly { id: keyof Kenmerken; label: string }[] = [
+  { id: 'aantal', label: 'Aantal' },
+  { id: 'datum', label: 'Datum' },
+  { id: 'zonderJaar', label: 'Zonder jaar' },
+  { id: 'tijd', label: 'Tijd' },
+  { id: 'notitie', label: 'Notitie' },
+]
 
 export interface Lijstje {
   id: string
   naam: string
   items: Item[]
-  /**
-   * Een herinneringslijstje: items met datum en tijd die je in je agenda zet (F32). `false`: de herinnering is
-   * uitgezet; de datums en de agenda blijven bewaard maar worden niet getoond (F38).
-   */
-  herinnering?: boolean
-  /** De agenda van dit herinneringslijstje, gekozen bij de eerste keer in de agenda zetten (F34). */
+  /** De extra kenmerken van de items (F41); zonder kenmerken is het een gewoon lijstje. */
+  kenmerken?: Kenmerken
+  /** De agenda van dit lijstje, gekozen bij de eerste keer in de agenda zetten (F34). */
   agenda?: AgendaKeuze
+}
+
+/** Staat Datum aan? Tijd telt alleen samen met Datum (F41). */
+export function heeftDatum(l: Lijstje): boolean {
+  return l.kenmerken?.datum === true
+}
+
+/** Datum zonder jaar: dag en maand komen elk jaar terug (F44). */
+export function heeftZonderJaar(l: Lijstje): boolean {
+  return heeftDatum(l) && l.kenmerken?.zonderJaar === true
+}
+
+export function heeftTijd(l: Lijstje): boolean {
+  return heeftDatum(l) && l.kenmerken?.tijd === true
+}
+
+/** Heeft het lijstje minstens één extra kenmerk? Dan opent tikken op een item het vak met de kenmerken (F42). */
+export function heeftKenmerken(l: Lijstje): boolean {
+  return heeftDatum(l) || l.kenmerken?.notitie === true || l.kenmerken?.aantal === true
 }
 
 /** Alle sleutels beginnen met "lijstjes-", omdat WoonWerk dezelfde opslag van de browser deelt (AC16). */
@@ -36,6 +77,16 @@ export const CURRENT_KEY = `${KEY_PREFIX}huidig`
  * komen de datums terug (§8).
  */
 export const HERINNERINGEN_KEY = `${KEY_PREFIX}herinneringen`
+/**
+ * De kenmerken van de lijstjes en de waarden van de items (vanaf versie 1.7, §8). Versie 1.6 en eerder kijken hier
+ * niet naar; voor die versies blijft `lijstjes-herinneringen` ook bijgewerkt.
+ */
+export const KENMERKEN_KEY = `${KEY_PREFIX}kenmerken`
+
+export interface KenmerkenOpslag {
+  lijstjes: Record<string, { kenmerken: Kenmerken; agenda?: AgendaKeuze }>
+  items: Record<string, { wanneer?: string; inAgenda?: string; notitie?: string; aantal?: string }>
+}
 
 export interface Herinneringen {
   /** `uit`: de herinnering van dit lijstje is uitgezet, de datums blijven bewaard (F38). */
@@ -45,6 +96,8 @@ export interface Herinneringen {
 
 export const MAX_NAAM = 30
 export const MAX_TEKST = 60
+export const MAX_AANTAL = 12
+export const MAX_NOTITIE = 300
 
 /** Een nieuwe installatie begint met één leeg lijstje (F13). */
 export const DEFAULT_LIJSTJES: Lijstje[] = [{ id: 'l1', naam: 'Mijn 1e lijstje', items: [] }]
@@ -111,22 +164,53 @@ export interface AddResult {
   revived: string[]
 }
 
-/** Zet items onderaan het lijstje, zonder dubbele (F3, F5). */
+const GETALLEN: Record<string, string> = {
+  twee: '2',
+  drie: '3',
+  vier: '4',
+  vijf: '5',
+  zes: '6',
+  zeven: '7',
+  acht: '8',
+  negen: '9',
+  tien: '10',
+  twaalf: '12',
+}
+
+const AANTAL = /^(\d+(?:[.,]\d+)?(?:\s*(?:x|×|g|gr|gram|kg|kilo|ml|cl|dl|l|liter|st|stuks?)(?=\s))?)\s+(\S.*)$/i
+
+/**
+ * Een aantal vooraan de tekst wordt het aantal van het item, als het lijstje het kenmerk Aantal heeft (F43):
+ * "3 appels" wordt aantal "3" en tekst "appels", "500 g gehakt" aantal "500 g". Ingesproken "twee" telt ook.
+ */
+export function splitAantal(text: string): { tekst: string; aantal?: string } {
+  const woorden = text.trim().split(/\s+/)
+  const getal = GETALLEN[woorden[0]?.toLocaleLowerCase('nl')]
+  const tekst = getal && woorden.length > 1 ? [getal, ...woorden.slice(1)].join(' ') : text.trim()
+  const m = AANTAL.exec(tekst)
+  if (!m) return { tekst: text.trim() }
+  return { tekst: m[2].trim(), aantal: m[1].replace(/\s+/g, ' ').slice(0, MAX_AANTAL) }
+}
+
+/** Zet items onderaan het lijstje, zonder dubbele (F3, F5); met het kenmerk Aantal ook het aantal (F43). */
 export function addItems(lijstje: Lijstje, texts: string[]): AddResult {
   const items = [...lijstje.items]
   const added: string[] = []
   const already: string[] = []
   const revived: string[] = []
-  for (const tekst of texts) {
+  const metAantal = lijstje.kenmerken?.aantal === true
+  for (const invoer of texts) {
+    const { tekst, aantal } = metAantal ? splitAantal(invoer) : { tekst: invoer, aantal: undefined }
     const index = items.findIndex((i) => sameText(i.tekst, tekst))
     if (index === -1) {
-      items.push({ id: newId(), tekst, af: false })
-      added.push(tekst)
+      items.push({ id: newId(), tekst, af: false, ...(aantal && { aantal }) })
+      added.push(aantal ? `${aantal} ${tekst}` : tekst)
     } else if (items[index].af) {
-      items[index] = { ...items[index], af: false }
+      items[index] = { ...items[index], af: false, ...(aantal && { aantal }) }
       revived.push(items[index].tekst)
-    } else if (!already.some((t) => sameText(t, tekst)) && !added.some((t) => sameText(t, tekst))) {
-      already.push(items[index].tekst)
+    } else {
+      if (aantal) items[index] = { ...items[index], aantal }
+      if (!already.some((t) => sameText(t, tekst)) && !added.some((t) => sameText(t, tekst))) already.push(items[index].tekst)
     }
   }
   return { lijstje: { ...lijstje, items }, added, already, revived }
@@ -181,47 +265,107 @@ export function basisLijstjes(lijstjes: readonly Lijstje[]): Lijstje[] {
   return lijstjes.map((l) => ({ id: l.id, naam: l.naam, items: l.items.map((i) => ({ id: i.id, tekst: i.tekst, af: i.af })) }))
 }
 
-/** Wat bij de herinneringslijstjes hoort, om apart te bewaren (§8). */
+/**
+ * Wat versie 1.4 t/m 1.6 als herinneringslijstje kennen, om apart te bewaren (§8): een lijstje met Datum is daar
+ * een herinneringslijstje; alleen datums met tijd kennen die versies.
+ */
 export function splitHerinneringen(lijstjes: readonly Lijstje[]): Herinneringen {
   const result: Herinneringen = { lijstjes: {}, items: {} }
   for (const l of lijstjes) {
-    // Een uitgezet herinneringslijstje bewaart zijn datums en agenda, om ze terug te zien als je hem weer aanzet (F38).
-    const bewaard = l.agenda || l.items.some((i) => i.wanneer || i.inAgenda)
-    if (!l.herinnering && !bewaard) continue
-    result.lijstjes[l.id] = { ...(l.agenda && { agenda: l.agenda }), ...(!l.herinnering && { uit: true as const }) }
-    for (const i of l.items) {
-      if (!i.wanneer && !i.inAgenda) continue
-      result.items[i.id] = { ...(i.wanneer && { wanneer: i.wanneer }), ...(i.inAgenda && { inAgenda: i.inAgenda }) }
+    const datums = l.items.filter((i) => isWanneer(i.wanneer) || isWanneer(i.inAgenda))
+    if (!heeftDatum(l) && !l.agenda && datums.length === 0) continue
+    result.lijstjes[l.id] = { ...(l.agenda && { agenda: l.agenda }), ...(!heeftDatum(l) && { uit: true as const }) }
+    for (const i of datums) {
+      result.items[i.id] = {
+        ...(isWanneer(i.wanneer) && { wanneer: i.wanneer }),
+        ...(isWanneer(i.inAgenda) && { inAgenda: i.inAgenda }),
+      }
     }
   }
   return result
 }
 
-/** Zet de apart bewaarde herinneringen terug bij de lijstjes; onbruikbare gegevens worden genegeerd. */
-export function mergeHerinneringen(lijstjes: Lijstje[], value: unknown): Lijstje[] {
-  if (typeof value !== 'object' || value === null) return lijstjes
-  const h = value as Partial<Herinneringen>
-  const lists = typeof h.lijstjes === 'object' && h.lijstjes !== null ? h.lijstjes : {}
-  const items = typeof h.items === 'object' && h.items !== null ? h.items : {}
-  return lijstjes.map((l) => {
-    if (!Object.hasOwn(lists, l.id)) return l
-    const extraLijstje = lists[l.id] as { agenda?: unknown; uit?: unknown } | null
-    const agenda = extraLijstje?.agenda
-    return {
-      ...l,
-      herinnering: extraLijstje?.uit !== true,
-      ...(isAgendaKeuze(agenda) && { agenda }),
-      items: l.items.map((i) => {
-        const extra = Object.hasOwn(items, i.id) ? (items[i.id] as { wanneer?: unknown; inAgenda?: unknown } | null) : null
-        if (!extra) return i
-        return {
-          ...i,
-          ...(isWanneer(extra.wanneer) && { wanneer: extra.wanneer }),
-          ...(isWanneer(extra.inAgenda) && { inAgenda: extra.inAgenda }),
-        }
-      }),
+/** De kenmerken van alle lijstjes en de waarden van de items, om apart te bewaren (§8). */
+export function splitKenmerken(lijstjes: readonly Lijstje[]): KenmerkenOpslag {
+  const result: KenmerkenOpslag = { lijstjes: {}, items: {} }
+  for (const l of lijstjes) {
+    // Elk lijstje staat erin, ook zonder kenmerken: zo weet een volgende keer laden dat het niet uit een oudere versie komt.
+    const k = l.kenmerken ?? {}
+    const kenmerken: Kenmerken = Object.fromEntries(KENMERKEN.filter((x) => k[x.id]).map((x) => [x.id, true]))
+    result.lijstjes[l.id] = { kenmerken, ...(l.agenda && { agenda: l.agenda }) }
+    for (const i of l.items) {
+      const extra = {
+        ...(i.wanneer && { wanneer: i.wanneer }),
+        ...(i.inAgenda && { inAgenda: i.inAgenda }),
+        ...(i.notitie && { notitie: i.notitie }),
+        ...(i.aantal && { aantal: i.aantal }),
+      }
+      if (Object.keys(extra).length > 0) result.items[i.id] = extra
     }
+  }
+  return result
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+}
+
+function tekstOf(value: unknown, max: number): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const t = value.trim().slice(0, max)
+  return t || undefined
+}
+
+/**
+ * Zet de apart bewaarde kenmerken en herinneringen terug bij de lijstjes; onbruikbare gegevens worden genegeerd (§8).
+ * Een lijstje dat niet in `kenmerken` staat, komt uit versie 1.6 of eerder: een (aan staand) herinneringslijstje
+ * wordt dan een lijstje met Datum en Tijd.
+ */
+export function mergeHerinneringen(lijstjes: Lijstje[], herinneringen: unknown, kenmerkenData?: unknown): Lijstje[] {
+  const h = record(herinneringen)
+  const hLijstjes = record(h.lijstjes)
+  const hItems = record(h.items)
+  const k = record(kenmerkenData)
+  const kLijstjes = record(k.lijstjes)
+  const kItems = record(k.items)
+  return lijstjes.map((l) => {
+    const nieuw = Object.hasOwn(kLijstjes, l.id) ? record(kLijstjes[l.id]) : null
+    const oud = Object.hasOwn(hLijstjes, l.id) ? record(hLijstjes[l.id]) : null
+    let kenmerken: Kenmerken | undefined
+    if (nieuw) {
+      const kk = record(nieuw.kenmerken)
+      const aan = KENMERKEN.filter((x) => kk[x.id] === true)
+      if (aan.length > 0) kenmerken = Object.fromEntries(aan.map((x) => [x.id, true]))
+    } else if (oud && oud.uit !== true) {
+      kenmerken = { datum: true, tijd: true }
+    }
+    const agenda = nieuw && Object.hasOwn(nieuw, 'agenda') ? nieuw.agenda : nieuw ? undefined : oud?.agenda
+    const items = l.items.map((i) => {
+      const o = Object.hasOwn(hItems, i.id) ? record(hItems[i.id]) : {}
+      const n = Object.hasOwn(kItems, i.id) ? record(kItems[i.id]) : {}
+      const wanneer = isMoment(n.wanneer) ? n.wanneer : isWanneer(o.wanneer) ? o.wanneer : undefined
+      const inAgenda = isMoment(n.inAgenda) ? n.inAgenda : isWanneer(o.inAgenda) ? o.inAgenda : undefined
+      const notitie = tekstOf(n.notitie, MAX_NOTITIE)
+      const aantal = tekstOf(n.aantal, MAX_AANTAL)
+      return {
+        ...i,
+        ...(wanneer && { wanneer }),
+        ...(inAgenda && { inAgenda }),
+        ...(notitie && { notitie }),
+        ...(aantal && { aantal }),
+      }
+    })
+    return { ...l, items, ...(kenmerken && { kenmerken }), ...(isAgendaKeuze(agenda) && { agenda }) }
   })
+}
+
+/** Leest apart bewaarde gegevens; beschadigd of afwezig geeft `null`, de lijstjes zelf zijn er dan nog. */
+function readJson(key: string): unknown {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? 'null')
+  } catch {
+    return null
+  }
 }
 
 export function loadLijstjes(): Lijstje[] {
@@ -230,13 +374,7 @@ export function loadLijstjes(): Lijstje[] {
     if (!raw) return DEFAULT_LIJSTJES
     const lijstjes = parseLijstjes(JSON.parse(raw))
     if (!lijstjes) return DEFAULT_LIJSTJES
-    let herinneringen: unknown = null
-    try {
-      herinneringen = JSON.parse(localStorage.getItem(HERINNERINGEN_KEY) ?? 'null')
-    } catch {
-      // Beschadigde herinneringen: de lijstjes zelf zijn er nog.
-    }
-    return mergeHerinneringen(lijstjes, herinneringen)
+    return mergeHerinneringen(lijstjes, readJson(HERINNERINGEN_KEY), readJson(KENMERKEN_KEY))
   } catch {
     return DEFAULT_LIJSTJES
   }
@@ -246,23 +384,60 @@ export function saveLijstjes(lijstjes: Lijstje[]): void {
   try {
     localStorage.setItem(LISTS_KEY, JSON.stringify(basisLijstjes(lijstjes)))
     localStorage.setItem(HERINNERINGEN_KEY, JSON.stringify(splitHerinneringen(lijstjes)))
+    localStorage.setItem(KENMERKEN_KEY, JSON.stringify(splitKenmerken(lijstjes)))
   } catch {
     // Opslag niet beschikbaar (bijv. privévenster); de app werkt dan zonder onthouden.
   }
 }
 
-/** Geeft een item een datum en tijd, of haalt die weg met `null` (F33). */
-export function setWanneer(lijstje: Lijstje, id: string, wanneer: string | null): Lijstje {
+export interface Details {
+  wanneer?: string
+  notitie?: string
+  aantal?: string
+}
+
+/**
+ * Bewaart de kenmerken van een item uit het vak met de kenmerken (F42). Alleen de kenmerken die aan staan, worden
+ * gewijzigd; de rest blijft bewaard. Verandert de datum (of tijd) die je ziet, dan staat het item niet meer met de
+ * goede datum in de agenda (F35).
+ */
+export function setDetails(lijstje: Lijstje, id: string, details: Details): Lijstje {
+  const k = lijstje.kenmerken ?? {}
+  const tijd = heeftTijd(lijstje)
   return {
     ...lijstje,
     items: lijstje.items.map((i) => {
       if (i.id !== id) return i
-      // Een andere tijd: het item staat niet meer (met de goede tijd) in de agenda (F35).
-      const { id: itemId, tekst, af, inAgenda } = i
-      const nieuw = wanneer && isWanneer(wanneer) ? wanneer : undefined
-      return { id: itemId, tekst, af, ...(nieuw && { wanneer: nieuw }), ...(inAgenda && inAgenda === nieuw && { inAgenda }) }
+      const next: Item = { ...i }
+      if (k.datum) {
+        const nieuw = details.wanneer && isMoment(details.wanneer) ? details.wanneer : undefined
+        if (nieuw) next.wanneer = nieuw
+        else delete next.wanneer
+        if (next.inAgenda && !momentGelijk(next.inAgenda, next.wanneer, tijd)) delete next.inAgenda
+      }
+      if (k.notitie) {
+        const n = details.notitie?.trim().slice(0, MAX_NOTITIE)
+        if (n) next.notitie = n
+        else delete next.notitie
+      }
+      if (k.aantal) {
+        const a = details.aantal?.trim().slice(0, MAX_AANTAL)
+        if (a) next.aantal = a
+        else delete next.aantal
+      }
+      return next
     }),
   }
+}
+
+/** Staat het item met de datum (en tijd) die je ziet in de agenda (F34)? */
+export function staatInAgenda(item: Item, tijd: boolean): boolean {
+  return Boolean(item.wanneer && item.inAgenda && momentGelijk(item.inAgenda, item.wanneer, tijd))
+}
+
+/** De datum (en tijd) zoals je die ziet: zonder tijd als het kenmerk Tijd uit staat (F41). */
+export function zichtbaarMoment(item: Item, tijd: boolean): string | undefined {
+  return item.wanneer ? zichtbaar(item.wanneer, tijd) : undefined
 }
 
 /** Het laatst geopende lijstje (F1, F14); `null` als er nog nooit een lijstje is geopend. */

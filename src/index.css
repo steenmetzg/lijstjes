@@ -10,7 +10,14 @@
   --accent: #1d4ed8;
   --accent-soft: #eff4ff;
 
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
   font-size: 16px;
   line-height: 1.4;
   color: var(--text);
@@ -50,7 +57,6 @@ button {
   padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
 }
 
-
 h1 {
   margin: 0;
   white-space: nowrap;
@@ -58,7 +64,6 @@ h1 {
   font-weight: 600;
   letter-spacing: -0.01em;
 }
-
 
 .header-actions {
   display: flex;
@@ -77,7 +82,6 @@ h1 {
   background: var(--surface);
   box-shadow: var(--shadow);
 }
-
 
 /* Aantal open items bij een lijstje op Mijn lijstjes (F9), zoals het label "vandaag" in WoonWerk. */
 .count {
@@ -110,7 +114,10 @@ h1 {
   background: var(--surface);
   box-shadow: var(--shadow);
   font-size: 0.75rem;
-  transition: background-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
 }
 
 .mode.selected {
@@ -208,7 +215,6 @@ h2 {
   color: #b42318;
 }
 
-
 .bottom {
   position: sticky;
   bottom: 0;
@@ -219,7 +225,6 @@ h2 {
   padding-bottom: max(16px, env(safe-area-inset-bottom));
   background: var(--bg);
 }
-
 
 .install {
   display: flex;
@@ -262,7 +267,6 @@ h2 {
   margin: 0;
   line-height: 1.45;
 }
-
 
 /* Versienummer onderaan de instellingen. */
 .version {
@@ -513,7 +517,7 @@ h2 {
   min-width: 0;
   min-height: 40px;
   margin: 4px 0;
-  padding: 0 8px;
+  padding: 0 6px;
   font: inherit;
   color: inherit;
   background: var(--bg);
@@ -577,7 +581,9 @@ h2 {
   border-bottom: 1px solid var(--line);
   background: var(--bg);
   /* Bedekt ook de schaduw langs de zijkanten van het lijstje. */
-  box-shadow: -4px 0 0 var(--bg), 4px 0 0 var(--bg);
+  box-shadow:
+    -4px 0 0 var(--bg),
+    4px 0 0 var(--bg);
   transform: translateX(-50%);
 }
 
@@ -620,7 +626,9 @@ h2 {
   border: 2px solid #c4c9d2;
   border-radius: 50%;
   color: #ffffff;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 
 .item.done .check {
@@ -742,7 +750,9 @@ h2 {
 }
 
 .list-row.current.dragging {
-  box-shadow: inset 4px 0 0 var(--accent), 0 6px 18px rgba(16, 24, 40, 0.16);
+  box-shadow:
+    inset 4px 0 0 var(--accent),
+    0 6px 18px rgba(16, 24, 40, 0.16);
 }
 
 .list-row .item-edit input {
@@ -792,9 +802,8 @@ h2 {
   padding-right: 8px;
 }
 
-/* ---- Herinneringslijstjes (F32 t/m F35) ---- */
+/* ---- Kenmerken: aantal, datum en tijd, notitie (F41 t/m F43) ---- */
 
-/* Tekst en daaronder datum en tijd. */
 .item-body {
   flex: 1;
   min-width: 0;
@@ -802,29 +811,55 @@ h2 {
   flex-direction: column;
 }
 
-.item-body .item-text,
 .item-body .item-edit {
   flex: none;
 }
 
-.item-body:has(.item-when) .item-text {
-  min-height: 0;
-  padding: 7px 4px 0;
+/* De tekst met daaronder eventueel de datum en de notitie, samen één knop. */
+.item-body .item-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 1px;
 }
 
-.item-body:has(.item-when) .item-edit input {
-  margin-bottom: 0;
+.item-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3em;
+  min-width: 0;
 }
 
-/* Datum en tijd: tik erop om ze te wijzigen (F33). */
+/* Het aantal staat gewoon vóór de tekst, in dezelfde letter: "3 kilo kaas" (F42). */
+.item-aantal {
+  flex-shrink: 0;
+}
+
+/* Datum en tijd onder de tekst (F33). */
 .item-when {
-  align-self: flex-start;
-  min-height: 26px;
-  padding: 1px 4px 7px;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.85rem;
-  text-align: left;
   color: var(--accent);
+}
+
+.item.done .item-text .item-when,
+.item.done .item-text .item-note {
+  text-decoration: none;
+}
+
+/* De notitie: klein en grijs, hoogstens twee regels in het lijstje. */
+.item-note {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: pre-line;
 }
 
 .item-when.past {
@@ -833,6 +868,99 @@ h2 {
 
 .item.done .item-when {
   color: var(--muted);
+}
+
+/* Het vak met de kenmerken van een item en het vak om het lijstje aan te passen, in de titelbalk (F41, F42). */
+.details,
+.instellen {
+  max-height: calc(100dvh - 90px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.field {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.field > span {
+  color: var(--muted);
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 10px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+
+.field textarea {
+  padding: 10px;
+  resize: vertical;
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.field input:disabled {
+  opacity: 0.5;
+}
+
+.field .date-field {
+  margin: 0;
+}
+
+.instellen-uitleg {
+  margin: 12px 0 0 !important;
+  color: var(--muted);
+}
+
+/* De schuifjes voor de kenmerken: naam links, schuifje rechts (F41). */
+.kenmerken {
+  display: grid;
+  margin-top: 2px;
+}
+
+.kenmerk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  border-bottom: 1px solid var(--line, #eceef1);
+  cursor: pointer;
+}
+
+.kenmerk:last-child {
+  border-bottom: none;
+}
+
+.kenmerk.off span {
+  color: var(--muted);
+}
+
+.instellen-agenda {
+  margin-top: 6px !important;
+}
+
+.link-button {
+  padding: 4px;
+  border: none;
+  box-shadow: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
 }
 
 /* Het vak met datum en tijd in de titelbalk (F33, F34). */
@@ -851,33 +979,6 @@ h2 {
 
 .date-choice input:focus-visible {
   outline: 2px solid var(--accent);
-}
-
-/* Het agenda-knopje: blauw als het item met deze datum en tijd in je agenda staat (F34). */
-.item-agenda.placed {
-  color: var(--accent);
-}
-
-.item-agenda:not(.placed) {
-  color: var(--muted);
-}
-
-.item-agenda:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.item-when.none {
-  color: var(--muted);
-  font-style: italic;
-}
-
-/* De titel van de agenda-keuze met rechts het schuifje (F38). */
-.agenda-choice-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 
 /* Het schuifje om de herinnering van een lijstje uit te zetten (F38). */
@@ -925,49 +1026,12 @@ h2 {
   border-color: #c9ced6;
 }
 
-.bell-off {
-  color: var(--muted);
-}
-
 .agenda-choice p,
-.date-choice p {
+.date-choice p,
+.details p {
   margin: 2px 0 0;
   color: var(--muted);
   font-size: 0.9rem;
-}
-
-/* Het belletje bij Nieuw lijstje, links op de plek van de greep: grijs, aan is blauw gevuld (F32). */
-.bell-slot {
-  overflow: visible;
-}
-
-.bell-slot .bell {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  box-shadow: none;
-  background: none;
-  color: var(--muted);
-}
-
-.bell-slot .bell.on {
-  background: var(--accent);
-  box-shadow: var(--shadow-accent);
-  color: #ffffff;
-}
-
-/* In de invoerregel van Mijn lijstjes iets ruimte tussen het belletje en het tekstveld. */
-.lists-screen .add-row .add-item {
-  margin-left: 6px;
-}
-
-.list-bell {
-  flex-shrink: 0;
-  color: var(--accent);
-}
-
-.list-bell.off {
-  color: var(--muted);
 }
 
 /* Een lege plek voor de greep (invoerregel, herinneringslijstje): niets om vast te pakken. */
@@ -1133,7 +1197,7 @@ span.item-grip {
   flex: 1;
   min-width: 0;
   min-height: 40px;
-  padding: 0 8px;
+  padding: 0 6px;
   font: inherit;
   font-size: 1.25rem;
   font-weight: 600;
@@ -1152,4 +1216,242 @@ span.item-grip {
 /* Uitleg op een iPhone of iPad (F23): het Deel-icoon staat in de tekst. */
 .install p svg {
   vertical-align: -3px;
+}
+
+.herinnering-switch:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Datum en tijd naast elkaar in het vak van een item (F33). */
+/* Een datum of tijd typen, met rechts in het veld een icoontje voor de kiezer (F33). */
+.moment-veld {
+  position: relative;
+  flex: 3;
+  min-width: 0;
+  display: flex;
+}
+
+.date-field.met-tijd .moment-veld + .moment-veld {
+  flex: none;
+  width: 76px;
+}
+
+.field .moment-veld input[type='text'] {
+  flex: 1;
+  width: 0;
+  padding: 0 24px 0 6px;
+  font-size: 0.95rem;
+}
+
+.moment-open {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 100%;
+  padding: 0 4px 0 0;
+  border: none;
+  color: var(--accent);
+}
+
+.moment-open:disabled {
+  opacity: 0.35;
+}
+
+/* Het onzichtbare veld waar de kiezer van de telefoon bij hoort, onder het icoontje. */
+.field .moment-kiezer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 34px;
+  min-height: 0;
+  height: 1px;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Een vak open in de titelbalk: het lijstje erachter scrolt niet mee. */
+html.vak-open,
+html.vak-open body {
+  overflow: hidden;
+}
+
+.details,
+.instellen {
+  overscroll-behavior: contain;
+}
+
+.field input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.date-field.met-tijd .date-clear {
+  width: 28px;
+}
+
+/* Melding na het bijwerken van de app (F45), zoals in WoonWerk. */
+.voice.new-version {
+  align-items: flex-start;
+}
+
+.new-version-body {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+.new-version-body strong {
+  color: var(--accent);
+}
+
+.inline-icon {
+  display: inline-grid;
+  place-items: center;
+  vertical-align: -3px;
+  color: var(--accent);
+}
+
+/* Weggooi-knoppen op een lijstje: icoon met een rood kruisje rechtsonder. */
+.met-kruisje {
+  position: relative;
+}
+
+.kruisje {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #b42318;
+  border: 1.5px solid #fff;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+}
+
+.met-kruisje:disabled .kruisje {
+  background: #9aa0a6;
+}
+
+/* Een korte foutmelding direct onder het veld waarin je typt (F5): rood, klein, over de hele breedte van de regel. */
+.add-row,
+.list-row {
+  flex-wrap: wrap;
+}
+
+.invoer-fout {
+  flex-basis: 100%;
+  margin: 0;
+  /* Links gelijk met de tekst in het invoerveld: na de greep en het rondje, plus de rand en ruimte van het veld. */
+  padding: 6px 12px 14px 81px;
+  color: #b42318;
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
+.lists-screen .invoer-fout {
+  /* Op Mijn lijstjes staat er alleen een greep vóór het veld. */
+  padding-left: 37px;
+}
+
+.lists-screen .list-row .invoer-fout {
+  /* Bij het wijzigen van een naam heeft het veld iets meer ruimte links. */
+  padding-left: 41px;
+}
+
+.item-body .invoer-fout {
+  /* Onder een item dat je in de regel aanpast: gelijk met de tekst in het veld. */
+  padding: 0 0 10px 7px;
+}
+
+.invoer-fout.ok {
+  color: var(--accent);
+}
+
+.confirm p.invoer-fout {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.875rem;
+  /* In een vak: direct onder het veld, gelijk met de tekst erin (label 54px, ruimte 8px, rand en ruimte 11px). */
+  padding: 6px 0 2px 73px;
+}
+
+/* Omschr in het vak met rechts in het veld een kleine microfoon (F46). */
+.tekst-veld {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.field .tekst-veld input {
+  padding-right: 38px;
+}
+
+.tekst-mic {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tekst-mic.listening {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.notitie-veld .tekst-mic {
+  top: 6px;
+  transform: none;
+}
+
+/* Op de regel met datum en tijd staat de microfoon tussen de velden en het kruisje (F46). */
+.date-field .tekst-mic {
+  position: static;
+  flex-shrink: 0;
+  transform: none;
+}
+
+/* Met tijd en microfoon is de regel vol: alles iets compacter, zodat 25-11-2026 en 14:30 helemaal te zien zijn. */
+.date-field.met-tijd {
+  gap: 2px;
+}
+
+.date-field.met-tijd .moment-veld + .moment-veld {
+  width: 76px;
+}
+
+/* De datum neemt de rest; op een telefoon met grotere letters blijft de tijd zo helemaal zichtbaar. */
+.date-field.met-tijd .moment-veld input[type='text'] {
+  padding: 0 20px 0 4px;
+  font-size: 0.9rem;
+}
+
+.date-field.met-tijd .moment-open {
+  width: 21px;
+  padding-right: 3px;
+}
+
+.date-field .tekst-mic {
+  width: 28px;
+  height: 28px;
+}
+
+.date-field.met-tijd .date-clear {
+  width: 20px;
 }
