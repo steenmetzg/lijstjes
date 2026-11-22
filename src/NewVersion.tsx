@@ -43,7 +43,7 @@ export default function NewVersion({ version, onClose }: { version: string; onCl
 
 /** De tekst van het welkom (F47), van Greco. */
 export const WELKOM_TEKST =
-  'Hou eenvoudig verschillende lijstjes op je telefoon bij. Lees de helptekst ([info]) om te zien wat je kan doen met Lijstjes.'
+  'Hou eenvoudig verschillende lijstjes op je telefoon bij. Lees de helptekst [info] om te zien wat je kan doen met Lijstjes.'
 
 /** Welkom bij de allereerste keer openen (F47), opgemaakt als de melding van een nieuwe versie. */
 export function Welkom({ onClose }: { onClose: () => void }) {
