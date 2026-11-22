@@ -101,6 +101,14 @@ describe('AC4: dubbel item', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Melk staat er al op.')
   })
 
+  it('toont de melding direct onder de invoerregel, niet onderaan het scherm (AC43)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await typeItem(user, 'melk')
+    await typeItem(user, 'melk')
+    expect(screen.getByRole('status').closest('li')).toHaveClass('add-row')
+  })
+
   it('laat de melding na 5 seconden verdwijnen', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
@@ -265,6 +273,8 @@ describe('AC8: lijstje maken', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Geef het lijstje een naam.')
     await user.type(field, ' ah {Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Er is al een lijstje AH.')
+    // Direct onder het veld voor een nieuw lijstje (AC43).
+    expect(screen.getByRole('alert').closest('li')).toHaveClass('add-row')
     expect(listNames()).toEqual(['AH', 'Klussen'])
   })
 
@@ -304,6 +314,8 @@ describe('AC9: naam wijzigen', () => {
     await user.clear(field)
     await user.type(field, 'klussen{Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Er is al een lijstje Klussen.')
+    // Direct onder de regel die je wijzigt (AC43).
+    expect(screen.getByRole('alert').closest('li')).toBe(field.closest('li'))
     await user.clear(field)
     await user.type(field, 'Jumbo{Enter}')
     await user.click(screen.getByRole('button', { name: 'Jumbo' }))

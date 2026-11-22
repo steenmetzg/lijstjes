@@ -62,6 +62,8 @@ interface RowProps {
   onStopEdit: () => void
   onError: (error: string | null) => void
   onDelete: () => void
+  /** De foutmelding bij het wijzigen van de naam, direct onder de regel (F11). */
+  fout: ReactNode
 }
 
 /**
@@ -83,6 +85,7 @@ function ListRow({
   onStopEdit,
   onError,
   onDelete,
+  fout,
 }: RowProps) {
   const [naam, setNaam] = useState(lijstje.naam)
   const open = openCount(lijstje)
@@ -179,6 +182,7 @@ function ListRow({
       >
         <Trash2 size={18} strokeWidth={1.75} aria-hidden />
       </button>
+      {fout}
     </li>
   )
 }
@@ -253,6 +257,16 @@ export default function Lists({
     onCreate(naam.trim())
   }
 
+  // Een korte foutmelding staat direct onder het veld waarin je typt, niet onderaan het scherm (F5, F10, F11).
+  const korteFout = notice?.kind === 'error' && !notice.vast ? notice.text : null
+  const fout = error ?? korteFout
+  const foutRegel = fout && (
+    <p className="invoer-fout" role={error ? 'alert' : 'status'}>
+      {fout}
+    </p>
+  )
+  const onderaan = korteFout ? null : notice
+
   return (
     <main className="app lists-screen">
       <header ref={header} className="main-header">
@@ -295,6 +309,7 @@ export default function Lists({
             onStopEdit={() => setEditing(null)}
             onError={setError}
             onDelete={() => askRemove(l)}
+            fout={editing === l.id && foutRegel}
           />
         ))}
         {/* De invoerregel voor een nieuw lijstje staat als laatste regel, zoals bij items (F10). */}
@@ -332,6 +347,7 @@ export default function Lists({
               </button>
             )}
           </form>
+          {editing === null && foutRegel}
         </li>
       </ul>
 
@@ -353,20 +369,14 @@ export default function Lists({
             </p>
           </section>
         ) : (
-          notice && (
-            <section className={notice.kind === 'error' ? 'voice error' : 'voice'} aria-live="polite">
-              <p role="status">{notice.text}</p>
+          onderaan && (
+            <section className={onderaan.kind === 'error' ? 'voice error' : 'voice'} aria-live="polite">
+              <p role="status">{onderaan.text}</p>
               <button type="button" className="voice-close" aria-label="Melding sluiten" onClick={onCloseNotice}>
                 <X size={18} strokeWidth={1.75} aria-hidden />
               </button>
             </section>
           )
-        )}
-        {error && (
-          // Net als de meldingen op een lijstje (F5): onderaan, wit met een streep links.
-          <section className="voice error">
-            <p role="alert">{error}</p>
-          </section>
         )}
         {install.show && !install.ios && (
           <section className="install" aria-label="App installeren">
@@ -385,8 +395,8 @@ export default function Lists({
             {installHow ? (
               <>
                 <p>
-                  Tik op de Deel-knop <Share size={16} strokeWidth={2} aria-label="(vierkantje met pijl omhoog)" />{' '}
-                  (in Safari soms eerst op ⋯) en kies <strong>Zet op beginscherm</strong>.
+                  Tik op de Deel-knop <Share size={16} strokeWidth={2} aria-label="(vierkantje met pijl omhoog)" /> (in
+                  Safari soms eerst op ⋯) en kies <strong>Zet op beginscherm</strong>.
                 </p>
                 <button type="button" className="install-now" onClick={install.notNow}>
                   Oké

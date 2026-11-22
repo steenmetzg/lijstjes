@@ -125,7 +125,10 @@ export default function App() {
     const result = addItems(lijstje, texts)
     update(lijstje.id, () => result.lijstje)
     const text = addMessage(result, spoken)
-    setNotice(text ? { kind: 'ok', text } : null)
+    // Getypt: de melding staat direct onder de invoerregel (AC43).
+    // Staat er iets al op, dan is het een (rode) foutmelding.
+    const kind = !spoken && result.already.length > 0 ? 'error' : 'ok'
+    setNotice(text ? { kind, text, ...(!spoken && { bijInvoer: true }) } : null)
   }
 
   function openList(id: string) {
