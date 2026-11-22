@@ -1455,3 +1455,21 @@ html.vak-open body {
 .date-field.met-tijd .date-clear {
   width: 20px;
 }
+
+/* Het i-icoontje in het welkom is een knop die de informatie opent (F47). */
+.new-version .inline-button {
+  display: inline-grid;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  vertical-align: -3px;
+}

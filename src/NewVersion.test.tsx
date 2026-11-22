@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { LISTS_KEY } from './lists'
@@ -77,5 +77,43 @@ describe('AC42: releasetekst per versie', () => {
     render(<App />)
     expect(melding()).toHaveTextContent(/^Nieuwe versie geïnstalleerd \(v[\d.]+\)$/)
     RELEASE_TEKSTEN[VERSIE] = oud
+  })
+})
+
+describe('AC46: welkom bij de allereerste keer openen', () => {
+  function welkom() {
+    return screen.queryByRole('region', { name: 'Welkom' })
+  }
+
+  it('toont het welkom met het i-icoontje tot je het sluit, en daarna nooit meer', () => {
+    localStorage.clear()
+    const { unmount } = render(<App />)
+    expect(welkom()).toHaveTextContent('Welkom bij Lijstjes!')
+    expect(welkom()).toHaveTextContent('Hou eenvoudig verschillende lijstjes op je telefoon bij.')
+    // Het i-icoontje in de tekst opent de informatie.
+    expect(within(welkom()!).getByRole('button', { name: 'Helptekst openen' })).toBeInTheDocument()
+    expect(melding()).toBeNull()
+    unmount()
+    // Niet gesloten: de volgende keer staat het er weer.
+    const tweede = render(<App />)
+    expect(welkom()).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Welkom sluiten' }))
+    expect(welkom()).toBeNull()
+    tweede.unmount()
+    render(<App />)
+    expect(welkom()).toBeNull()
+  })
+
+  it('het i-icoontje in het welkom opent de informatie', () => {
+    localStorage.clear()
+    render(<App />)
+    fireEvent.click(within(welkom()!).getByRole('button', { name: 'Helptekst openen' }))
+    expect(screen.getByRole('heading', { name: 'Over Lijstjes' })).toBeInTheDocument()
+  })
+
+  it('toont geen welkom aan wie de app al gebruikte', () => {
+    rememberFirstList()
+    render(<App />)
+    expect(welkom()).toBeNull()
   })
 })

@@ -29,8 +29,8 @@ import {
   type Lijstje,
 } from './lists'
 import { isAgenda, PER_ITEM, volgendeKeer, zetInAgenda, zichtbaar, type AgendaKeuze } from './agenda'
-import NewVersion from './NewVersion'
-import { markVersionSeen, versionToAnnounce } from './newVersion'
+import NewVersion, { Welkom } from './NewVersion'
+import { markVersionSeen, versionToAnnounce, welkomGezien, welkomTonen } from './newVersion'
 import Reminders from './Reminders'
 import { dueItems } from './reminders'
 import Settings from './Settings'
@@ -76,6 +76,8 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
+  // Welkom bij de allereerste keer openen, tot je hem sluit (F47). Eerst bepalen: daarna wordt er opgeslagen.
+  const [welkom, setWelkom] = useState(welkomTonen)
   // Melding na het bijwerken van de app, tot je hem sluit (F45).
   const [newVersion, setNewVersion] = useState(() => versionToAnnounce(__APP_VERSION__))
   useEffect(() => {
@@ -97,10 +99,19 @@ export default function App() {
       />
     ) : null
 
-  // Onderaan het scherm: eerst de melding van een nieuwe versie, dan de herinneringen.
+  // Onderaan het scherm: eerst het welkom of de melding van een nieuwe versie, dan de herinneringen.
   const reminders =
-    newVersion || dueMelding ? (
+    welkom || newVersion || dueMelding ? (
       <>
+        {welkom && (
+          <Welkom
+            onInfo={() => setScreen('info')}
+            onClose={() => {
+              welkomGezien()
+              setWelkom(false)
+            }}
+          />
+        )}
         {newVersion && <NewVersion version={newVersion} onClose={() => setNewVersion(null)} />}
         {dueMelding}
       </>
@@ -408,6 +419,13 @@ export default function App() {
       onRemove={(id) => update(lijstje.id, (l) => ({ ...l, items: l.items.filter((i) => i.id !== id) }))}
       onClear={(which) =>
         update(lijstje.id, (l) => ({ ...l, items: which === 'alles' ? [] : l.items.filter((i) => !i.af) }))
+      }
+      // Terug zoals het was; wat je sindsdien toevoegde, blijft erbij (F8).
+      onUndoClear={(items) =>
+        update(lijstje.id, (l) => ({
+          ...l,
+          items: [...items, ...l.items.filter((i) => !items.some((o) => o.id === i.id))],
+        }))
       }
       onBack={() => {
         setNotice(null)
