@@ -1433,11 +1433,13 @@ html.vak-open body {
 }
 
 .date-field.met-tijd .moment-veld + .moment-veld {
-  width: 70px;
+  width: 76px;
 }
 
+/* De datum neemt de rest; op een telefoon met grotere letters blijft de tijd zo helemaal zichtbaar. */
 .date-field.met-tijd .moment-veld input[type='text'] {
   padding: 0 20px 0 4px;
+  font-size: 0.9rem;
 }
 
 .date-field.met-tijd .moment-open {
@@ -1446,10 +1448,10 @@ html.vak-open body {
 }
 
 .date-field .tekst-mic {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
 }
 
 .date-field.met-tijd .date-clear {
-  width: 22px;
+  width: 20px;
 }
