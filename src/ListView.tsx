@@ -58,6 +58,8 @@ export type Notice = {
   vast?: boolean
   /** Hoort bij wat je net typte: de melding staat direct onder het veld (AC43). */
   bijInvoer?: boolean
+  /** Hoort bij het datumveld in het vak van een item (AC43). */
+  veld?: 'datum'
 }
 
 interface Props {
@@ -85,7 +87,8 @@ interface Props {
    */
   onAddDetails: (tekst: string, details: Details) => { id: string; tekst: string } | null
   /** Een foutmelding onderaan, bijv. bij een datum die de app niet kent (F33). */
-  onFout: (text: string) => void
+  /** Een foutmelding in het vak; `veld` zegt onder welk veld hij staat (AC43). */
+  onFout: (text: string, veld?: 'datum') => void
   /**
    * De agenda van het lijstje kiezen en, met een item, dat item erin zetten met de datum (en tijd) die je ziet (F34).
    * `titel` is de tekst van het item, ook als die net is gewijzigd of het item net is gemaakt.
@@ -464,6 +467,7 @@ export default function ListView({
         (zonderJaar ? leesDagMaand(detail.datum) : leesDatum(detail.datum)) === null
           ? `Die datum ken ik niet. Typ bijvoorbeeld ${zonderJaar ? '25-11' : `25-11-${new Date().getFullYear()}`}.`
           : 'Die tijd ken ik niet. Typ bijvoorbeeld 09:30.',
+        'datum',
       )
       return
     }
@@ -532,6 +536,7 @@ export default function ListView({
     </p>
   )
   const foutInVak = instellen !== null || detail !== null
+  const datumFout = notice?.veld === 'datum'
   const onderaan = fout ? null : notice
 
   return (
@@ -627,6 +632,7 @@ export default function ListView({
                   }}
                 />
               </label>
+              {instellen && foutRegel}
               <p className="instellen-uitleg">Extra kenmerken per item</p>
               <div className="kenmerken">
                 {KENMERKEN.map((k) => {
@@ -671,7 +677,6 @@ export default function ListView({
                   </button>
                 </p>
               )}
-              {foutInVak && foutRegel}
               <div className="confirm-buttons">
                 <button type="button" className="cancel-half" onClick={() => setInstellen(null)}>
                   Annuleren
@@ -713,6 +718,7 @@ export default function ListView({
                   }
                 />
               </label>
+              {!datumFout && foutRegel}
               {kenmerken.aantal && (
                 <label className="field">
                   <span>Aantal</span>
@@ -765,6 +771,7 @@ export default function ListView({
                   </div>
                 </div>
               )}
+              {datum && datumFout && foutRegel}
               {kenmerken.notitie && (
                 <label className="field">
                   <span>Notitie</span>
@@ -788,7 +795,6 @@ export default function ListView({
                   {zonderJaar && ' (elk jaar)'}.
                 </p>
               )}
-              {foutInVak && foutRegel}
               <div className="confirm-buttons">
                 {datum && (
                   <button

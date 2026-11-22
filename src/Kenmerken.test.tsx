@@ -659,8 +659,9 @@ describe('AC37: aantal en notitie', () => {
     // Staat het item er al op, dan blijft het vak open met de melding.
     await user.type(screen.getByRole('textbox', { name: 'Item toevoegen' }), 'Melk{Enter}')
     expect(screen.getByRole('status')).toHaveTextContent('Melk staat er al op.')
-    // De melding staat in het vak zelf, boven de knoppen (AC43).
-    expect(within(screen.getByRole('region', { name: 'Nieuw item' })).getByRole('status')).toBeInTheDocument()
+    // De melding staat in het vak, direct onder het veld Omschr (AC43).
+    const melding = within(screen.getByRole('region', { name: 'Nieuw item' })).getByRole('status')
+    expect(melding.previousElementSibling).toContainElement(screen.getByRole('textbox', { name: 'Tekst' }))
     await user.click(screen.getByRole('button', { name: 'Annuleren' }))
     expect(itemTexts()).toEqual(['melk', '2 pakken koffie', 'appels', 'gehakt'])
 
