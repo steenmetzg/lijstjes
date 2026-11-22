@@ -32,11 +32,11 @@ export interface Kenmerken {
 }
 
 export const KENMERKEN: readonly { id: keyof Kenmerken; label: string }[] = [
+  { id: 'aantal', label: 'Aantal' },
   { id: 'datum', label: 'Datum' },
   { id: 'zonderJaar', label: 'Zonder jaar' },
   { id: 'tijd', label: 'Tijd' },
   { id: 'notitie', label: 'Notitie' },
-  { id: 'aantal', label: 'Aantal' },
 ]
 
 export interface Lijstje {
