@@ -10,6 +10,7 @@ import {
   Mic,
   SlidersHorizontal,
   Trash2,
+  Undo2,
   X,
 } from 'lucide-react'
 import {
@@ -54,6 +55,9 @@ const SWIPE_DELETE = 80
 const SWIPE_LOCK = 10
 
 /** Een melding onderaan; `vast` blijft staan tot je hem sluit (F35). */
+/** Hoe lang je weggooien van items ongedaan kunt maken (F8), zoals een lijstje (F12). */
+const UNDO_SECONDEN = 10
+
 /** Een veld in het vak van een item waarin je kunt inspreken (F46). */
 type Veld = 'tekst' | 'aantal' | 'datum' | 'notitie'
 
@@ -94,6 +98,8 @@ interface Props {
   onRemove: (id: string) => void
   onMove: (from: number, to: number) => void
   onClear: (which: 'af' | 'alles') => void
+  /** Zet de items terug zoals ze waren vóór het weggooien (F8). */
+  onUndoClear: (items: Item[]) => void
   onBack: () => void
   mic: {
     show: boolean
@@ -400,6 +406,7 @@ export default function ListView({
   onRemove,
   onMove,
   onClear,
+  onUndoClear,
   onBack,
   mic,
   onDetails,
@@ -526,6 +533,13 @@ export default function ListView({
   }
 
   /** Begin je te typen op een lijstje met kenmerken, dan opent het vak Nieuw item met wat je typte (F42). */
+  /** Gooit items weg; 10 seconden lang kan dat ongedaan worden (F8). */
+  function clear(which: 'af' | 'alles') {
+    const weg = which === 'alles' ? lijstje.items.length : lijstje.items.filter((i) => i.af).length
+    setWeggegooid({ items: lijstje.items, aantal: weg })
+    onClear(which)
+  }
+
   function startNew(value: string) {
     closeAll()
     setDetail({
@@ -568,6 +582,20 @@ export default function ListView({
   const datumFout = notice?.veld === 'datum'
   // Luistert de microfoon voor het veld Omschr in het vak (F46)?
   const [dicteert, setDicteert] = useState<Veld | null>(null)
+  // De items van vóór het weggooien, voor Ongedaan maken; na 10 seconden is het definitief (F8).
+  const [weggegooid, setWeggegooid] = useState<{ items: Item[]; aantal: number } | null>(null)
+  const [nog, setNog] = useState(UNDO_SECONDEN)
+  useEffect(() => {
+    if (!weggegooid) return
+    setNog(UNDO_SECONDEN)
+    const start = Date.now()
+    const tick = setInterval(() => setNog(Math.max(0, Math.ceil(UNDO_SECONDEN - (Date.now() - start) / 1000))), 250)
+    const timer = setTimeout(() => setWeggegooid(null), UNDO_SECONDEN * 1000)
+    return () => {
+      clearInterval(tick)
+      clearTimeout(timer)
+    }
+  }, [weggegooid])
   useEffect(() => {
     if (!mic.listening) setDicteert(null)
   }, [mic.listening])
@@ -683,7 +711,7 @@ export default function ListView({
             disabled={!hasDone}
             onClick={() => {
               closeAll()
-              onClear('af')
+              clear('af')
             }}
           >
             <CircleCheck size={20} strokeWidth={1.75} aria-hidden />
@@ -698,7 +726,7 @@ export default function ListView({
             disabled={items.length === 0}
             onClick={() => {
               closeAll()
-              onClear('alles')
+              clear('alles')
             }}
           >
             <Trash2 size={20} strokeWidth={1.75} aria-hidden />
@@ -1029,6 +1057,10 @@ export default function ListView({
                   startNew(e.target.value)
                 } else setText(limitTyped(e.target.value))
               }}
+              // Met kenmerken opent tikken in de invoerregel meteen het vak Nieuw item (F42).
+              onClick={() => {
+                if (metKenmerken && detail === null) startNew('')
+              }}
             />
             {mic.show && (
               <button
@@ -1039,7 +1071,13 @@ export default function ListView({
                 onClick={() => {
                   // Inspreken haalt de melding bij wat je typte weg (AC43).
                   if (mic.listening) mic.stop()
-                  else {
+                  else if (metKenmerken) {
+                    // Met kenmerken opent het vak Nieuw item en wat je zegt, komt in Omschr (F46).
+                    if (fout) onCloseNotice()
+                    startNew('')
+                    setDicteert('tekst')
+                    mic.start((t) => gezegd('tekst', t))
+                  } else {
                     if (fout) onCloseNotice()
                     mic.start()
                   }
@@ -1078,6 +1116,25 @@ export default function ListView({
               </button>
             </section>
           )
+        )}
+        {weggegooid && (
+          <section className="voice" aria-live="polite">
+            <p role="status">{weggegooid.aantal === 1 ? '1 item' : `${weggegooid.aantal} items`} weggegooid</p>
+            <button
+              type="button"
+              className="undo-button"
+              onClick={() => {
+                onUndoClear(weggegooid.items)
+                setWeggegooid(null)
+              }}
+            >
+              <Undo2 size={18} strokeWidth={1.75} aria-hidden />
+              Ongedaan maken
+              <span className="undo-count" aria-hidden>
+                {nog}
+              </span>
+            </button>
+          </section>
         )}
       </div>
     </main>

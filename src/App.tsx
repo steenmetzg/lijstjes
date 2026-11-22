@@ -409,6 +409,13 @@ export default function App() {
       onClear={(which) =>
         update(lijstje.id, (l) => ({ ...l, items: which === 'alles' ? [] : l.items.filter((i) => !i.af) }))
       }
+      // Terug zoals het was; wat je sindsdien toevoegde, blijft erbij (F8).
+      onUndoClear={(items) =>
+        update(lijstje.id, (l) => ({
+          ...l,
+          items: [...items, ...l.items.filter((i) => !items.some((o) => o.id === i.id))],
+        }))
+      }
       onBack={() => {
         setNotice(null)
         setScreen('lijstjes')

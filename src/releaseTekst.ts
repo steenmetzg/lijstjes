@@ -12,6 +12,8 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  '1.7.12':
+    'Alle of de afgevinkte items weggooien kun je nu 10 seconden ongedaan maken. Op een lijstje met kenmerken opent het invoervak meteen als je in de invoerregel tikt of de [microfoon] gebruikt.',
   // Zelfde tekst als 1.7.5: wie die versie oversloeg, ziet alleen de melding van de nieuwste (F45).
   '1.7.11':
     'Je kan nu zelf bepalen welke informatie je wilt bijhouden in een Lijstje. Kies voor Datum, Tijd, Datum zonder jaar, Aantal en Notities.',
