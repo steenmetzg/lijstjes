@@ -12,6 +12,8 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  '1.8.0':
+    'Op een lijstje met kenmerken schuift het kaartje van een item nu open in het lijstje zelf, ook voor een nieuw item. Aantal en Notitie hebben een kruisje om het veld leeg te maken.',
   '1.7.12':
     'Alle of de afgevinkte items weggooien kun je nu 10 seconden ongedaan maken. Op een lijstje met kenmerken opent het invoervak meteen als je in de invoerregel tikt of de [microfoon] gebruikt.',
   // Zelfde tekst als 1.7.5: wie die versie oversloeg, ziet alleen de melding van de nieuwste (F45).

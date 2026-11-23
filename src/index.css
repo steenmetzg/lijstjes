@@ -1473,3 +1473,132 @@ html.vak-open body {
   cursor: pointer;
   vertical-align: -3px;
 }
+
+/*
+ * Het kaartje van een item schuift in het lijstje zelf open (F42, vanaf versie 1.8): de regel met het rondje en de
+ * tekst als veld, met daaronder de velden van de kenmerken. De namen van de velden staan klein erboven, zodat ook
+ * datum en tijd naast elkaar passen. De andere items worden even lichter.
+ */
+.items.kaartje-open > .item:not(.open) {
+  opacity: 0.45;
+}
+
+/* Met een open kaartje blijft de invoerregel niet onderaan vastzitten, zodat het kaartje er niet achter valt. */
+.items.kaartje-open > .add-row {
+  position: static;
+}
+
+.item.open {
+  display: block;
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.add-row.open {
+  padding-top: 0;
+}
+
+.item-vak form {
+  display: block;
+}
+
+.vak-rij {
+  display: flex;
+  align-items: center;
+  padding-right: 12px;
+}
+
+.vak-rij .tekst-veld {
+  flex: 1;
+}
+
+.vak-rij .tekst-veld input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  margin: 4px 0;
+  padding: 0 38px 0 10px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+
+.vak-rij .tekst-veld input:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.uitklap {
+  display: grid;
+  gap: 8px;
+  padding: 2px 12px 14px 16px;
+}
+
+.uitklap .field {
+  display: block;
+  margin: 0;
+}
+
+.uitklap .field > span:first-child {
+  display: block;
+  margin: 0 0 4px 4px;
+  font-size: 0.8125rem;
+}
+
+.met-kruisje-veld {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.met-kruisje-veld .tekst-veld {
+  flex: 1;
+}
+
+/* Een kruisje om het veld leeg te maken, net als bij de datum (F42). */
+.veld-leeg {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  height: 44px;
+  border: none;
+  color: var(--muted);
+}
+
+.veld-leeg:disabled {
+  opacity: 0.35;
+}
+
+.uitklap .veld-leeg,
+.uitklap .date-clear {
+  width: 28px;
+}
+
+.uitklap .confirm-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 4px;
+}
+
+.uitklap .confirm-buttons button {
+  min-height: 48px;
+}
+
+.uitklap .confirm-buttons .wide {
+  grid-column: 1 / -1;
+}
+
+.uitklap p:not(.invoer-fout) {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.item-vak .invoer-fout {
+  /* Direct onder het veld, gelijk met de tekst erin (greep 30px, rondje 44px, rand en ruimte 11px). */
+  padding: 0 12px 6px 85px;
+}
+
+.uitklap .invoer-fout {
+  padding: 0 0 0 15px;
+}
