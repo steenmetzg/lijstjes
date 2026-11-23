@@ -910,3 +910,46 @@ describe('AC39: datum zonder jaar', () => {
     expect(deelTekst(a)).toBe('Anne, elk jaar op 3 jan')
   })
 })
+
+describe('AC48: verlopen items op Mijn lijstjes', () => {
+  it('toont blauw de niet-verlopen en rood de verlopen open items, samen het aantal open items', async () => {
+    storeLists(
+      [
+        list('h', 'Afspraken', ['Tandarts', 'Anne bellen', 'APK', ['Kapper', true], 'Bellen']),
+        list('k', 'Klusjes', ['Dakgoot']),
+        list('a', 'AH', ['melk', 'brood']),
+      ],
+      'a',
+    )
+    localStorage.setItem(
+      KENMERKEN_KEY,
+      JSON.stringify({
+        lijstjes: { h: { kenmerken: { datum: true, tijd: true } }, k: { kenmerken: { datum: true } } },
+        items: {
+          'h-0': { wanneer: '2026-11-06T09:00' },
+          'h-1': { wanneer: '2026-11-07T09:00' },
+          'h-2': { wanneer: '2026-11-07T11:00' },
+          'h-3': { wanneer: '2026-11-01T09:00' },
+          'k-0': { wanneer: '2026-11-02' },
+        },
+      }),
+    )
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Terug naar Mijn lijstjes' }))
+    const afspraken = screen.getByRole('button', { name: 'Afspraken, 2 open, 2 verlopen' })
+    expect(afspraken.querySelector('.count')).toHaveTextContent('2')
+    expect(afspraken.querySelector('.count-verlopen')).toHaveTextContent('2')
+    // Rood links, blauw rechts.
+    expect([...afspraken.querySelectorAll('.count, .count-verlopen')].map((e) => e.className)).toEqual([
+      'count-verlopen',
+      'count',
+    ])
+    const klusjes = screen.getByRole('button', { name: 'Klusjes, 1 verlopen' })
+    // Het blauwe rondje houdt zijn plek rechts vrij, maar is niet te zien.
+    expect(klusjes.querySelector('.count')).toHaveClass('leeg')
+    expect(klusjes.querySelector('.count-verlopen')).toHaveTextContent('1')
+    const ah = screen.getByRole('button', { name: 'AH, 2 open' })
+    expect(ah.querySelector('.count-verlopen')).toBeNull()
+  })
+})
