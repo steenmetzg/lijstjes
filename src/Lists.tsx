@@ -157,15 +157,16 @@ function ListRow({
           onClick={onOpen}
         >
           <span className="list-name">{lijstje.naam}</span>
+          {/* Elk rondje staat midden in een plek van 44 px breed, net als het potlood en de prullenbak (F9). */}
           {verlopen > 0 && (
-            <span className="count-verlopen" aria-hidden>
-              {verlopen}
+            <span className="count-plek" aria-hidden>
+              <span className="count-verlopen">{verlopen}</span>
             </span>
           )}
           {/* Blauw staat altijd rechts; zijn alle open items verlopen, dan houdt een leeg rondje zijn plek vrij (F9). */}
           {(open > 0 || verlopen > 0) && (
-            <span className={open > 0 ? 'count' : 'count leeg'} aria-hidden>
-              {open > 0 ? open : 0}
+            <span className="count-plek" aria-hidden>
+              <span className={open > 0 ? 'count' : 'count leeg'}>{open > 0 ? open : 0}</span>
             </span>
           )}
         </button>
