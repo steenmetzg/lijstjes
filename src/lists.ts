@@ -94,7 +94,7 @@ export interface Herinneringen {
   items: Record<string, { wanneer?: string; inAgenda?: string }>
 }
 
-export const MAX_NAAM = 30
+export const MAX_NAAM = 50
 export const MAX_TEKST = 60
 export const MAX_AANTAL = 12
 export const MAX_NOTITIE = 300
