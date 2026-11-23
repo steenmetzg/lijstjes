@@ -339,8 +339,11 @@ function MomentVeld({
   onChange,
   disabled,
   zonderJaar = false,
+  kruisje,
 }: {
   soort: 'datum' | 'tijd'
+  /** Een kruisje in het veld, vóór het kalendertje (vanaf versie 1.8.1). */
+  kruisje?: ReactNode
   /** Datum zonder jaar: alleen dag en maand (F44). */
   zonderJaar?: boolean
   waarde: string
@@ -380,6 +383,7 @@ function MomentVeld({
           onChange(e.target.value ? (datum ? datumTekst(e.target.value, zonderJaar) : e.target.value) : '')
         }
       />
+      {kruisje}
       <button
         type="button"
         className="moment-open"
@@ -690,6 +694,15 @@ export default function ListView({
     })
   }
 
+  /** Een kruisje rechts in een veld van het kaartje, dat het veld leegmaakt (F42). */
+  function leegKnop(label: string, leeg: boolean, onClick: () => void) {
+    return (
+      <button type="button" className="veld-leeg" aria-label={label} disabled={leeg} onClick={onClick}>
+        <X size={18} strokeWidth={1.75} aria-hidden />
+      </button>
+    )
+  }
+
   /** Een kleine microfoon in een veld van het vak (F46). */
   function veldMic(veld: Veld) {
     if (!mic.show) return null
@@ -755,6 +768,7 @@ export default function ListView({
                   })
                 }
               />
+              {leegKnop('Tekst weghalen', !detail.tekst, () => setDetail({ ...detail, tekst: '' }))}
               {veldMic('tekst')}
             </span>
           </div>
@@ -764,34 +778,24 @@ export default function ListView({
             {kenmerken.aantal && (
               <label className="field">
                 <span>Aantal</span>
-                <span className="met-kruisje-veld">
-                  <span className="tekst-veld">
-                    <input
-                      type="text"
-                      aria-label="Aantal"
-                      placeholder="bijv. 2 of 500 g"
-                      enterKeyHint="done"
-                      autoComplete="off"
-                      maxLength={MAX_AANTAL}
-                      value={detail.aantal}
-                      onChange={(e) =>
-                        setDetail({
-                          ...detail,
-                          aantal: e.target.value.slice(0, MAX_AANTAL),
-                        })
-                      }
-                    />
-                    {veldMic('aantal')}
-                  </span>
-                  <button
-                    type="button"
-                    className="veld-leeg"
-                    aria-label="Aantal weghalen"
-                    disabled={!detail.aantal}
-                    onClick={() => setDetail({ ...detail, aantal: '' })}
-                  >
-                    <X size={18} strokeWidth={1.75} aria-hidden />
-                  </button>
+                <span className="tekst-veld">
+                  <input
+                    type="text"
+                    aria-label="Aantal"
+                    placeholder="bijv. 2 of 500 g"
+                    enterKeyHint="done"
+                    autoComplete="off"
+                    maxLength={MAX_AANTAL}
+                    value={detail.aantal}
+                    onChange={(e) =>
+                      setDetail({
+                        ...detail,
+                        aantal: e.target.value.slice(0, MAX_AANTAL),
+                      })
+                    }
+                  />
+                  {leegKnop('Aantal weghalen', !detail.aantal, () => setDetail({ ...detail, aantal: '' }))}
+                  {veldMic('aantal')}
                 </span>
               </label>
             )}
@@ -803,6 +807,11 @@ export default function ListView({
                   <MomentVeld
                     soort="datum"
                     zonderJaar={zonderJaar}
+                    kruisje={leegKnop(
+                      tijd ? 'Datum en tijd weghalen' : 'Datum weghalen',
+                      !detail.datum && !detail.tijd,
+                      () => setDetail({ ...detail, datum: '', tijd: '' }),
+                    )}
                     waarde={detail.datum}
                     onChange={(datum) => setDetail({ ...detail, datum })}
                   />
@@ -816,15 +825,6 @@ export default function ListView({
                     />
                   )}
                   {veldMic('datum')}
-                  <button
-                    type="button"
-                    className="date-clear"
-                    aria-label={tijd ? 'Datum en tijd weghalen' : 'Datum weghalen'}
-                    disabled={!detail.datum && !detail.tijd}
-                    onClick={() => setDetail({ ...detail, datum: '', tijd: '' })}
-                  >
-                    <X size={18} strokeWidth={1.75} aria-hidden />
-                  </button>
                 </div>
               </div>
             )}
@@ -832,31 +832,21 @@ export default function ListView({
             {kenmerken.notitie && (
               <label className="field">
                 <span>Notitie</span>
-                <span className="met-kruisje-veld">
-                  <span className="tekst-veld notitie-veld">
-                    <textarea
-                      aria-label="Notitie"
-                      rows={3}
-                      maxLength={MAX_NOTITIE}
-                      value={detail.notitie}
-                      onChange={(e) =>
-                        setDetail({
-                          ...detail,
-                          notitie: e.target.value.slice(0, MAX_NOTITIE),
-                        })
-                      }
-                    />
-                    {veldMic('notitie')}
-                  </span>
-                  <button
-                    type="button"
-                    className="veld-leeg"
-                    aria-label="Notitie weghalen"
-                    disabled={!detail.notitie}
-                    onClick={() => setDetail({ ...detail, notitie: '' })}
-                  >
-                    <X size={18} strokeWidth={1.75} aria-hidden />
-                  </button>
+                <span className="tekst-veld notitie-veld">
+                  <textarea
+                    aria-label="Notitie"
+                    rows={3}
+                    maxLength={MAX_NOTITIE}
+                    value={detail.notitie}
+                    onChange={(e) =>
+                      setDetail({
+                        ...detail,
+                        notitie: e.target.value.slice(0, MAX_NOTITIE),
+                      })
+                    }
+                  />
+                  {leegKnop('Notitie weghalen', !detail.notitie, () => setDetail({ ...detail, notitie: '' }))}
+                  {veldMic('notitie')}
                 </span>
               </label>
             )}

@@ -1476,8 +1476,9 @@ html.vak-open body {
 
 /*
  * Het kaartje van een item schuift in het lijstje zelf open (F42, vanaf versie 1.8): de regel met het rondje en de
- * tekst als veld, met daaronder de velden van de kenmerken. De namen van de velden staan klein erboven, zodat ook
- * datum en tijd naast elkaar passen. De andere items worden even lichter.
+ * tekst als veld, met daaronder de velden van de kenmerken. Alle velden staan onder elkaar, gelijk met het tekstveld;
+ * de namen staan klein erboven, het kruisje om leeg te maken rechts in het veld en de microfoontjes helemaal rechts,
+ * ook onder elkaar (vanaf versie 1.8.1). De andere items worden even lichter.
  */
 .items.kaartje-open > .item:not(.open) {
   opacity: 0.45;
@@ -1504,19 +1505,28 @@ html.vak-open body {
 .vak-rij {
   display: flex;
   align-items: center;
-  padding-right: 12px;
+  padding-right: 8px;
 }
 
-.vak-rij .tekst-veld {
+/* Een veld met rechts erin het kruisje, en de microfoon rechts ernaast. */
+.item-vak .tekst-veld {
+  position: relative;
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-vak .tekst-veld input,
+.item-vak .tekst-veld textarea {
+  flex: 1;
+  min-width: 0;
 }
 
 .vak-rij .tekst-veld input {
-  flex: 1;
-  min-width: 0;
   min-height: 44px;
   margin: 4px 0;
-  padding: 0 38px 0 10px;
+  padding: 0 36px 0 10px;
   font: inherit;
   color: inherit;
   background: var(--bg);
@@ -1528,10 +1538,59 @@ html.vak-open body {
   outline: 2px solid var(--accent);
 }
 
+.uitklap .tekst-veld input,
+.uitklap .tekst-veld textarea {
+  padding-right: 36px;
+}
+
+.item-vak .tekst-mic {
+  position: static;
+  flex-shrink: 0;
+  transform: none;
+}
+
+.item-vak .notitie-veld {
+  align-items: flex-start;
+}
+
+.item-vak .notitie-veld .tekst-mic {
+  margin-top: 6px;
+}
+
+/* Het kruisje rechts in het veld (F42); bij de datum vóór het kalendertje. */
+.veld-leeg {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 36px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+
+.item-vak .tekst-veld:not(:has(.tekst-mic)) .veld-leeg {
+  right: 0;
+}
+
+.notitie-veld .veld-leeg {
+  top: 2px;
+  transform: none;
+}
+
+.veld-leeg:disabled {
+  opacity: 0.35;
+}
+
 .uitklap {
   display: grid;
   gap: 8px;
-  padding: 2px 12px 14px 16px;
+  /* Gelijk met het tekstveld van het item: na de greep en het rondje. */
+  padding: 2px 8px 14px 74px;
 }
 
 .uitklap .field {
@@ -1545,33 +1604,30 @@ html.vak-open body {
   font-size: 0.8125rem;
 }
 
-.met-kruisje-veld {
-  display: flex;
-  align-items: center;
+.uitklap .date-field,
+.uitklap .date-field.met-tijd {
   gap: 4px;
+  margin: 0;
 }
 
-.met-kruisje-veld .tekst-veld {
-  flex: 1;
+.uitklap .date-field .tekst-mic {
+  width: 32px;
+  height: 32px;
+  flex: none;
 }
 
-/* Een kruisje om het veld leeg te maken, net als bij de datum (F42). */
-.veld-leeg {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  height: 44px;
-  border: none;
-  color: var(--muted);
+.uitklap .date-field.met-tijd .moment-veld + .moment-veld {
+  width: 72px;
 }
 
-.veld-leeg:disabled {
-  opacity: 0.35;
+.uitklap .date-field .moment-veld:first-child input[type='text'] {
+  padding-right: 48px;
 }
 
-.uitklap .veld-leeg,
-.uitklap .date-clear {
-  width: 28px;
+.uitklap .moment-veld .veld-leeg {
+  right: 22px;
+  width: 26px;
+  z-index: 1;
 }
 
 .uitklap .confirm-buttons {
@@ -1600,5 +1656,5 @@ html.vak-open body {
 }
 
 .uitklap .invoer-fout {
-  padding: 0 0 0 15px;
+  padding: 0 0 0 11px;
 }
