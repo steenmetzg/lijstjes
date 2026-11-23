@@ -12,6 +12,8 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  // Alleen het rode rondje even groot als het blauwe: geen eigen tekst.
+  '1.8.4': '',
   '1.8.3':
     'Op Mijn lijstjes staat naast het blauwe rondje nu een rood rondje met het aantal verlopen items. Samen zijn ze het aantal open items.',
   '1.8.2':
