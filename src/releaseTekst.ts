@@ -12,6 +12,7 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  '1.8.6': 'De naam van een lijstje mag nu 50 tekens lang zijn. De rondjes en knoppen op Mijn lijstjes staan dichter bij elkaar.',
   // Alleen de rondjes en knoppen op Mijn lijstjes netjes uitgelijnd: geen eigen tekst.
   '1.8.5': '',
   // Alleen het rode rondje even groot als het blauwe: geen eigen tekst.

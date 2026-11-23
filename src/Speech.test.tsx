@@ -157,7 +157,7 @@ describe('AC24: naam van een nieuw lijstje inspreken', () => {
   it('maakt van de hele zin één naam met een hoofdletter, zonder te splitsen bij "komma"', () => {
     expect(spokenName(['verjaardag Anne komma zaterdag.'])).toBe('Verjaardag Anne komma zaterdag')
     expect(spokenName(['Jan en Piet', 'jan komma piet'])).toBe('Jan en Piet')
-    expect(spokenName(['a'.repeat(40)])).toHaveLength(30)
+    expect(spokenName(['a'.repeat(60)])).toHaveLength(50)
   })
 
   it('maakt op Mijn lijstjes een nieuw lijstje met de ingesproken naam en opent het', async () => {
