@@ -1,7 +1,7 @@
 # Specificatie: Lijstjes
 
 Status: **goedgekeurd door Greco op 6 november 2026**
-Versie: 1.8.6 (23 november 2026): de naam van een lijstje mag 50 tekens lang zijn (was 30); een oudere versie kort een langere naam bij het openen in tot 30 tekens; op Mijn lijstjes staan de rondjes, het potlood en de prullenbak nog dichter bij elkaar, elk midden in een plek van 30 px (F9, F10, F11; op verzoek van Greco, app-versie Lijstjes 1.8.6)
+Versie: 1.8.6 (23 november 2026): de naam van een lijstje mag 50 tekens lang zijn (was 30); een oudere versie kort een langere naam bij het openen in tot 30 tekens; op Mijn lijstjes staan de rondjes, het potlood en de prullenbak nog dichter bij elkaar, elk midden in een plek van 30 px; de rondjes zijn echt rond (22 px), alleen bij twee of meer cijfers breder (F9, F10, F11; op verzoek van Greco, app-versie Lijstjes 1.8.6)
 Versie 1.8.5 (23 november 2026): op Mijn lijstjes staan rood rondje, blauw rondje, potlood en prullenbak op gelijke afstand (elk midden in een plek van 36 px, zodat de naam meer ruimte heeft); het blauwe rondje is iets donkerder lichtblauw, zodat het op wit even groot oogt als het rode (F9; op verzoek van Greco, app-versie Lijstjes 1.8.5)
 Versie 1.8.4 (23 november 2026): het rode rondje op Mijn lijstjes is even groot als het blauwe (F9; op verzoek van Greco, app-versie Lijstjes 1.8.4)
 Versie 1.8.3 (23 november 2026): op Mijn lijstjes staat naast het lichtblauwe rondje een rood rondje met het aantal verlopen items (niet afgevinkt, datum of tijd voorbij, zoals de rode datum van F33); links ervan; het blauwe rondje staat altijd rechts en telt dan alleen de open items die niet verlopen zijn, zodat blauw en rood samen het aantal open items zijn (F9, AC48; op verzoek van Greco, app-versie Lijstjes 1.8.3)
