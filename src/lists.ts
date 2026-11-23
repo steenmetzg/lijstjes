@@ -1,6 +1,6 @@
 // De lijstjes en hun items: de gegevens, bewaren en ophalen, en de regels voor toevoegen (F3 t/m F5).
 
-import { isAgendaKeuze, isMoment, isWanneer, momentGelijk, zichtbaar, type AgendaKeuze } from './agenda'
+import { isAgendaKeuze, isMoment, isVoorbij, isWanneer, momentGelijk, zichtbaar, type AgendaKeuze } from './agenda'
 import { KEY_PREFIX } from './storageKey'
 
 export interface Item {
@@ -120,6 +120,16 @@ export function capitalize(text: string): string {
 
 export function openCount(lijstje: Lijstje): number {
   return lijstje.items.filter((i) => !i.af).length
+}
+
+/**
+ * Het aantal verlopen items: niet afgevinkt, met een datum (en tijd) die voorbij is, zoals de rode datum in het
+ * lijstje (F33). Alleen bij lijstjes met het kenmerk Datum; Zonder jaar is nooit verlopen (F44).
+ */
+export function verlopenCount(lijstje: Lijstje, now: Date = new Date()): number {
+  if (!heeftDatum(lijstje)) return 0
+  const jaarlijks = heeftZonderJaar(lijstje)
+  return lijstje.items.filter((i) => !i.af && i.wanneer && isVoorbij(i.wanneer, now, jaarlijks)).length
 }
 
 export function itemsText(n: number): string {

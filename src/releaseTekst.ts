@@ -12,6 +12,8 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  '1.8.3':
+    'Op Mijn lijstjes staat naast het blauwe rondje nu een rood rondje met het aantal verlopen items. Samen zijn ze het aantal open items.',
   '1.8.2':
     'In het opengeschoven kaartje van een item kun je het item nu ook afvinken met het rondje.',
   '1.8.1':

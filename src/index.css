@@ -93,6 +93,24 @@ h1 {
   color: var(--accent);
 }
 
+.count.leeg {
+  visibility: hidden;
+}
+
+.count-verlopen {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #b91c1c;
+  color: #fff;
+}
+
 .modes {
   display: grid;
   /* Zoveel even brede kolommen als er knoppen aan staan. */
