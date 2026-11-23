@@ -12,6 +12,8 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  // Alleen de rondjes en knoppen op Mijn lijstjes netjes uitgelijnd: geen eigen tekst.
+  '1.8.5': '',
   // Alleen het rode rondje even groot als het blauwe: geen eigen tekst.
   '1.8.4': '',
   '1.8.3':
