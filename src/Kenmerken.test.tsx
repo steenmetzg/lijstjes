@@ -179,15 +179,19 @@ describe('AC26: datum en tijd', () => {
     expect(isVoorbij('2026-11-07', new Date(2026, 10, 7, 23, 0))).toBe(false)
   })
 
-  it('zolang het vak open is, scrolt de pagina erachter niet', async () => {
+  it('het kaartje van het item schuift open in het lijstje zelf, en het lijstje scrolt gewoon (vanaf 1.8)', async () => {
     storeAfspraken({})
     const user = userEvent.setup()
     render(<App />)
-    expect(document.documentElement).not.toHaveClass('vak-open')
     const box = await openDetails(user, 'APK')
-    expect(document.documentElement).toHaveClass('vak-open')
-    await user.click(within(box).getByRole('button', { name: 'Annuleren' }))
+    const rij = box.closest('li')
+    expect(rij).toHaveClass('item', 'open')
+    expect(screen.getByRole('list', { name: 'Items op Afspraken' })).toContainElement(box)
+    expect(document.querySelector('.list-header')).not.toContainElement(box)
     expect(document.documentElement).not.toHaveClass('vak-open')
+    await user.click(within(box).getByRole('button', { name: 'Annuleren' }))
+    expect(box).not.toBeInTheDocument()
+    expect(itemTexts()).toContain('APK')
   })
 
   it('leest een getypte datum en tijd', () => {
@@ -623,6 +627,32 @@ describe('AC34: per item kiezen', () => {
   })
 })
 
+describe('AC47: kaartje met kruisjes', () => {
+  it('Aantal en Notitie hebben een kruisje dat het veld leegmaakt', async () => {
+    const user = userEvent.setup()
+    storeLists([list('a', 'AH', ['melk'])], 'a')
+    render(<App />)
+    await kenmerken(user, 'AH', ['Aantal', 'Notitie'])
+    let box = await openDetails(user, 'melk')
+    expect(within(box).getByRole('button', { name: 'Aantal weghalen' })).toBeDisabled()
+    expect(within(box).getByRole('button', { name: 'Notitie weghalen' })).toBeDisabled()
+    await user.type(within(box).getByLabelText('Aantal'), '2 liter')
+    await user.type(within(box).getByLabelText('Notitie'), 'halfvol')
+    await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
+    const rows = screen.getByRole('list', { name: 'Items op AH' })
+    expect(within(rows).getByText('2 liter')).toBeInTheDocument()
+
+    box = await openDetails(user, 'melk')
+    await user.click(within(box).getByRole('button', { name: 'Aantal weghalen' }))
+    await user.click(within(box).getByRole('button', { name: 'Notitie weghalen' }))
+    expect(within(box).getByLabelText('Aantal')).toHaveValue('')
+    expect(within(box).getByLabelText('Notitie')).toHaveValue('')
+    await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
+    expect(within(rows).queryByText('2 liter')).not.toBeInTheDocument()
+    expect(within(rows).queryByText('halfvol')).not.toBeInTheDocument()
+  })
+})
+
 describe('AC45: vak Nieuw item meteen open', () => {
   it('tikken in de invoerregel van een lijstje met kenmerken opent meteen het vak Nieuw item', async () => {
     const user = userEvent.setup()
@@ -673,7 +703,9 @@ describe('AC37: aantal en notitie', () => {
     let box = screen.getByRole('region', { name: 'Nieuw item' })
     expect(within(box).getByLabelText('Tekst')).toHaveValue('3 appels')
     expect(within(box).getByLabelText('Tekst')).toHaveFocus()
-    expect(screen.getByRole('textbox', { name: 'Item toevoegen' })).toHaveValue('')
+    // De invoerregel zelf is opengeschoven tot het kaartje van het nieuwe item (vanaf 1.8).
+    expect(screen.queryByRole('textbox', { name: 'Item toevoegen' })).not.toBeInTheDocument()
+    expect(box.closest('li')).toHaveClass('add-row', 'open')
     await user.keyboard('{Enter}')
     expect(screen.queryByRole('region', { name: 'Nieuw item' })).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Item toevoegen' })).toHaveFocus()
