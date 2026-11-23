@@ -1658,3 +1658,10 @@ html.vak-open body {
 .uitklap .invoer-fout {
   padding: 0 0 0 11px;
 }
+
+/* Het rondje in het open kaartje: afgevinkt blauw met een wit vinkje, ook bij een nieuw item (F42). */
+.item-vak .check.aan {
+  background: var(--accent);
+  border-color: var(--accent);
+  border-style: solid;
+}

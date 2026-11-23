@@ -24,7 +24,7 @@ import {
   splitAantal,
   type Lijstje,
 } from './lists'
-import { itemTexts, list, storeLists, typeItem } from './test/helpers'
+import { itemButton, itemTexts, list, storeLists, typeItem } from './test/helpers'
 
 vi.mock('./folderStore', () => ({
   loadStoredFolder: async () => null,
@@ -628,6 +628,30 @@ describe('AC34: per item kiezen', () => {
 })
 
 describe('AC47: kaartje met kruisjes', () => {
+  it('het rondje in het kaartje vinkt af bij Bewaren, niet bij Annuleren; ook bij een nieuw item', async () => {
+    const user = userEvent.setup()
+    storeLists([list('a', 'AH', ['melk'])], 'a')
+    render(<App />)
+    await kenmerken(user, 'AH', ['Aantal'])
+    let box = await openDetails(user, 'melk')
+    await user.click(within(box).getByRole('button', { name: 'Afvinken' }))
+    expect(within(box).getByRole('button', { name: 'Afvinken' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(box).getByRole('button', { name: 'Annuleren' }))
+    expect(itemButton('melk')).toHaveAttribute('aria-pressed', 'false')
+
+    box = await openDetails(user, 'melk')
+    await user.click(within(box).getByRole('button', { name: 'Afvinken' }))
+    await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
+    expect(itemButton('melk')).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('textbox', { name: 'Item toevoegen' }))
+    box = screen.getByRole('region', { name: 'Nieuw item' })
+    await user.type(within(box).getByLabelText('Tekst'), 'brood')
+    await user.click(within(box).getByRole('button', { name: 'Afvinken' }))
+    await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
+    expect(itemButton('brood')).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('Aantal en Notitie hebben een kruisje dat het veld leegmaakt', async () => {
     const user = userEvent.setup()
     storeLists([list('a', 'AH', ['melk'])], 'a')

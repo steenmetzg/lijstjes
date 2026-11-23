@@ -221,7 +221,7 @@ function ItemRow({
   if (vak) {
     // Het kaartje van het item is opengeschoven: de regel zelf is het vak (F42).
     return (
-      <li className={item.af ? 'item open done' : 'item open'} data-id={item.id}>
+      <li className="item open" data-id={item.id}>
         {vak}
       </li>
     )
@@ -327,6 +327,8 @@ interface Detail {
   tijd: string
   notitie: string
   aantal: string
+  /** Afgevinkt; wordt bewaard met Bewaren (F42, vanaf versie 1.8.2). */
+  af: boolean
 }
 
 /**
@@ -491,6 +493,7 @@ export default function ListView({
       tijd: w.slice(11, 16),
       notitie: item.notitie ?? '',
       aantal: item.aantal ?? '',
+      af: item.af,
     })
   }
 
@@ -531,10 +534,12 @@ export default function ListView({
       const nieuw = onAddDetails(detail.tekst, details)
       if (!nieuw) return
       item = nieuw
+      if (detail.af) onToggle(nieuw.id)
       // Klaar voor het volgende item (F3): de invoerregel komt terug zodra het kaartje dicht is.
       invoerKlaarzetten.current = true
     } else {
       if (!onDetails(detail.id, detail.tekst, details)) return
+      if (detailItem && detail.af !== detailItem.af) onToggle(detail.id)
       item = {
         id: detail.id,
         tekst: detail.tekst.trim() || (detailItem?.tekst ?? ''),
@@ -566,6 +571,7 @@ export default function ListView({
       tijd: '',
       notitie: '',
       aantal: '',
+      af: false,
     })
   }
 
@@ -748,9 +754,18 @@ export default function ListView({
           {/* De regel van het item zelf: de tekst wordt een veld, zoals bij een gewoon lijstje (F27). */}
           <div className="vak-rij">
             <span className="item-grip" aria-hidden />
-            <span className="item-check" aria-hidden>
-              <span className="check">{detailItem?.af && <Check size={16} strokeWidth={2.5} />}</span>
-            </span>
+            {/* Afvinken kan ook in het kaartje; het wordt bewaard met Bewaren (F42). */}
+            <button
+              type="button"
+              className="item-check"
+              aria-label="Afvinken"
+              aria-pressed={detail.af}
+              onClick={() => setDetail({ ...detail, af: !detail.af })}
+            >
+              <span className={detail.af ? 'check aan' : 'check'} aria-hidden>
+                {detail.af && <Check size={16} strokeWidth={2.5} />}
+              </span>
+            </button>
             <span className="tekst-veld">
               <input
                 type="text"
