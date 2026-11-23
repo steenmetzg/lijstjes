@@ -302,18 +302,18 @@ describe('AC8: lijstje maken', () => {
     expect(listNames()).toEqual(['AH', 'Klussen'])
   })
 
-  it('houdt een naam op 30 tekens, ook als het toetsenbord zich niet aan de grens houdt', async () => {
+  it('houdt een naam op 50 tekens, ook als het toetsenbord zich niet aan de grens houdt', async () => {
     const user = userEvent.setup()
     render(<App />)
     await openMyLists(user)
     const field = screen.getByRole('textbox', { name: 'Naam van het nieuwe lijstje' })
     // Zo plakt het toetsenbord van Android soms tekst voorbij maxLength.
-    fireEvent.change(field, { target: { value: 'a'.repeat(40) } })
-    expect(field).toHaveValue('a'.repeat(30))
+    fireEvent.change(field, { target: { value: 'a'.repeat(60) } })
+    expect(field).toHaveValue('a'.repeat(50))
     await user.click(screen.getByRole('button', { name: 'Naam van Mijn 1e lijstje wijzigen' }))
     const rename = screen.getByRole('textbox', { name: 'Nieuwe naam voor Mijn 1e lijstje' })
-    fireEvent.change(rename, { target: { value: 'b'.repeat(40) } })
-    expect(rename).toHaveValue('b'.repeat(30))
+    fireEvent.change(rename, { target: { value: 'b'.repeat(60) } })
+    expect(rename).toHaveValue('b'.repeat(50))
   })
 
   it('heeft geen maximum aan het aantal lijstjes', async () => {

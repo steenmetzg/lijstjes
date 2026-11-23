@@ -743,7 +743,7 @@ h2 {
 
 /* Mijn lijstjes (F9 t/m F12, F30): de lijstjes in één wit vlak, net als de items van een lijstje. */
 .list-row .item-delete {
-  width: 36px;
+  width: 30px;
 }
 
 .list-row .item-delete:disabled {
@@ -764,10 +764,10 @@ h2 {
 }
 
 /* Elk rondje midden in een plek zo breed als de knoppen ernaast: rood, blauw, potlood en prullenbak op gelijke afstand
-   (36 px, zodat de naam meer ruimte heeft). */
+   (30 px, zodat de naam meer ruimte heeft). */
 .count-plek {
   flex-shrink: 0;
-  width: 36px;
+  width: 30px;
   display: flex;
   justify-content: center;
 }
