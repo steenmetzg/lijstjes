@@ -12,6 +12,8 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  '1.8.2':
+    'In het opengeschoven kaartje van een item kun je het item nu ook afvinken met het rondje.',
   '1.8.1':
     'Op een lijstje met kenmerken schuift het kaartje van een item nu open in het lijstje zelf, ook voor een nieuw item. Elk veld heeft een kruisje om het leeg te maken.',
   '1.8.0':
