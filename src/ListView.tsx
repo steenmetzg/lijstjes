@@ -147,6 +147,8 @@ interface RowProps {
   kenmerken: Required<Kenmerken>
   /** Opent het vak met de kenmerken (F42); zonder kenmerken pas je de tekst in de regel zelf aan (F27). */
   onOpen: (() => void) | null
+  /** Het opengeschoven kaartje van dit item, met de velden van de kenmerken (F42); `null` als het dicht is. */
+  vak: ReactNode
 }
 
 /**
@@ -165,6 +167,7 @@ function ItemRow({
   kenmerken,
   onOpen,
   fout,
+  vak,
 }: RowProps) {
   const [dx, setDx] = useState(0)
   const [editing, setEditing] = useState(false)
@@ -213,6 +216,15 @@ function ItemRow({
     // Met Enter en een tekst die er al op staat blijft het veld open, met de melding eronder (AC43).
     const goed = text.trim() === item.tekst || onEdit(text)
     if (goed || !e) setEditing(false)
+  }
+
+  if (vak) {
+    // Het kaartje van het item is opengeschoven: de regel zelf is het vak (F42).
+    return (
+      <li className={item.af ? 'item open done' : 'item open'} data-id={item.id}>
+        {vak}
+      </li>
+    )
   }
 
   const style = dx
@@ -327,8 +339,11 @@ function MomentVeld({
   onChange,
   disabled,
   zonderJaar = false,
+  kruisje,
 }: {
   soort: 'datum' | 'tijd'
+  /** Een kruisje in het veld, vóór het kalendertje (vanaf versie 1.8.1). */
+  kruisje?: ReactNode
   /** Datum zonder jaar: alleen dag en maand (F44). */
   zonderJaar?: boolean
   waarde: string
@@ -368,6 +383,7 @@ function MomentVeld({
           onChange(e.target.value ? (datum ? datumTekst(e.target.value, zonderJaar) : e.target.value) : '')
         }
       />
+      {kruisje}
       <button
         type="button"
         className="moment-open"
@@ -446,6 +462,7 @@ export default function ListView({
   const items = datum ? opDatum(lijstje.items, zonderJaar) : lijstje.items
   const hasDone = items.some((i) => i.af)
   const input = useRef<HTMLInputElement>(null)
+  const invoerKlaarzetten = useRef(false)
   const scroll = useScrollList(items, datum ? () => {} : onMove)
   const { header, list, addRow, bottom, hidden } = scroll
 
@@ -514,8 +531,8 @@ export default function ListView({
       const nieuw = onAddDetails(detail.tekst, details)
       if (!nieuw) return
       item = nieuw
-      // Klaar voor het volgende item (F3).
-      input.current?.focus()
+      // Klaar voor het volgende item (F3): de invoerregel komt terug zodra het kaartje dicht is.
+      invoerKlaarzetten.current = true
     } else {
       if (!onDetails(detail.id, detail.tekst, details)) return
       item = {
@@ -562,13 +579,44 @@ export default function ListView({
 
   const detailZien = detail ? (detailWanneer(detail) ?? undefined) : undefined
 
-  // Staat er een vak open in de titelbalk, dan scrolt het lijstje erachter niet mee.
-  const vakOpen = instellen !== null || choosing !== null || detail !== null
+  // Staat er een vak open in de titelbalk, dan scrolt het lijstje erachter niet mee. Het kaartje van een item staat
+  // in het lijstje zelf; dan scrolt het lijstje gewoon (F42).
+  const vakOpen = instellen !== null || choosing !== null
   useEffect(() => {
     if (!vakOpen) return
     document.documentElement.classList.add('vak-open')
     return () => document.documentElement.classList.remove('vak-open')
   }, [vakOpen])
+  useEffect(() => {
+    if (detail === null && invoerKlaarzetten.current) {
+      invoerKlaarzetten.current = false
+      input.current?.focus()
+    }
+  }, [detail])
+
+  // Het open kaartje helemaal in beeld: onder de titelbalk en boven de meldingen (of het toetsenbord) (F42).
+  const kaartjeOpen = detail === null ? null : (detail.id ?? 'nieuw')
+  useEffect(() => {
+    if (kaartjeOpen === null) return
+    function inBeeld() {
+      const el = list.current?.querySelector('.item.open')
+      const pagina = document.scrollingElement
+      if (!el || !pagina) return
+      const r = el.getBoundingClientRect()
+      const boven = (header.current?.getBoundingClientRect().bottom ?? 0) + 8
+      const onder = (window.visualViewport?.height ?? window.innerHeight) - 8
+      if (r.bottom > onder) pagina.scrollTop += Math.min(r.bottom - onder, r.top - boven)
+      else if (r.top < boven) pagina.scrollTop -= boven - r.top
+    }
+    const frame = requestAnimationFrame(inBeeld)
+    // Gaat het toetsenbord open, dan wordt het scherm kleiner: nog eens in beeld brengen.
+    window.visualViewport?.addEventListener('resize', inBeeld)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.visualViewport?.removeEventListener('resize', inBeeld)
+    }
+  }, [kaartjeOpen, list, header])
+
   const detailInAgenda = detailItem?.inAgenda && detailZien && zichtbaar(detailZien, tijd) === detailItem.inAgenda
 
   // Een korte foutmelding staat bij het veld waarin je typt: in het open vak, anders onder de invoerregel (F5).
@@ -583,7 +631,10 @@ export default function ListView({
   // Luistert de microfoon voor het veld Omschr in het vak (F46)?
   const [dicteert, setDicteert] = useState<Veld | null>(null)
   // De items van vóór het weggooien, voor Ongedaan maken; na 10 seconden is het definitief (F8).
-  const [weggegooid, setWeggegooid] = useState<{ items: Item[]; aantal: number } | null>(null)
+  const [weggegooid, setWeggegooid] = useState<{
+    items: Item[]
+    aantal: number
+  } | null>(null)
   const [nog, setNog] = useState(UNDO_SECONDEN)
   useEffect(() => {
     if (!weggegooid) return
@@ -636,8 +687,20 @@ export default function ListView({
       // Een notitie vult aan wat er al stond; een nieuwe notitie begint met een hoofdletter.
       const oud = d.notitie.trim()
       const zin = oud ? t : t.charAt(0).toLocaleUpperCase('nl') + t.slice(1)
-      return { ...d, notitie: (oud ? `${oud} ${zin}` : zin).slice(0, MAX_NOTITIE) }
+      return {
+        ...d,
+        notitie: (oud ? `${oud} ${zin}` : zin).slice(0, MAX_NOTITIE),
+      }
     })
+  }
+
+  /** Een kruisje rechts in een veld van het kaartje, dat het veld leegmaakt (F42). */
+  function leegKnop(label: string, leeg: boolean, onClick: () => void) {
+    return (
+      <button type="button" className="veld-leeg" aria-label={label} disabled={leeg} onClick={onClick}>
+        <X size={18} strokeWidth={1.75} aria-hidden />
+      </button>
+    )
   }
 
   /** Een kleine microfoon in een veld van het vak (F46). */
@@ -662,6 +725,159 @@ export default function ListView({
       >
         <Mic size={17} strokeWidth={2} aria-hidden />
       </button>
+    )
+  }
+
+  /** Het open kaartje van een item of van een nieuw item, met de velden van de kenmerken (F42). */
+  function itemVak() {
+    if (!detail) return null
+    return (
+      <section
+        className="item-vak"
+        aria-label={detailItem ? `Details van ${detailItem.tekst}` : 'Nieuw item'}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setDetail(null)
+        }}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            saveDetail(false)
+          }}
+        >
+          {/* De regel van het item zelf: de tekst wordt een veld, zoals bij een gewoon lijstje (F27). */}
+          <div className="vak-rij">
+            <span className="item-grip" aria-hidden />
+            <span className="item-check" aria-hidden>
+              <span className="check">{detailItem?.af && <Check size={16} strokeWidth={2.5} />}</span>
+            </span>
+            <span className="tekst-veld">
+              <input
+                type="text"
+                aria-label="Tekst"
+                enterKeyHint="done"
+                autoComplete="off"
+                maxLength={MAX_TEKST}
+                // Een nieuw item: verder typen in dit veld (F42).
+                autoFocus={detail.id === null}
+                value={detail.tekst}
+                onChange={(e) =>
+                  setDetail({
+                    ...detail,
+                    tekst: e.target.value.slice(0, MAX_TEKST),
+                  })
+                }
+              />
+              {leegKnop('Tekst weghalen', !detail.tekst, () => setDetail({ ...detail, tekst: '' }))}
+              {veldMic('tekst')}
+            </span>
+          </div>
+          {!datumFout && foutRegel}
+          {/* Daaronder schuiven de velden van de kenmerken open (F42). */}
+          <div className="uitklap">
+            {kenmerken.aantal && (
+              <label className="field">
+                <span>Aantal</span>
+                <span className="tekst-veld">
+                  <input
+                    type="text"
+                    aria-label="Aantal"
+                    placeholder="bijv. 2 of 500 g"
+                    enterKeyHint="done"
+                    autoComplete="off"
+                    maxLength={MAX_AANTAL}
+                    value={detail.aantal}
+                    onChange={(e) =>
+                      setDetail({
+                        ...detail,
+                        aantal: e.target.value.slice(0, MAX_AANTAL),
+                      })
+                    }
+                  />
+                  {leegKnop('Aantal weghalen', !detail.aantal, () => setDetail({ ...detail, aantal: '' }))}
+                  {veldMic('aantal')}
+                </span>
+              </label>
+            )}
+            {datum && (
+              // Datum en tijd op één regel; tikken op een veld opent de kiezer van de telefoon (F33).
+              <div className="field">
+                <span>Datum</span>
+                <div className={tijd ? 'date-field met-tijd' : 'date-field'}>
+                  <MomentVeld
+                    soort="datum"
+                    zonderJaar={zonderJaar}
+                    kruisje={leegKnop(
+                      tijd ? 'Datum en tijd weghalen' : 'Datum weghalen',
+                      !detail.datum && !detail.tijd,
+                      () => setDetail({ ...detail, datum: '', tijd: '' }),
+                    )}
+                    waarde={detail.datum}
+                    onChange={(datum) => setDetail({ ...detail, datum })}
+                  />
+                  {tijd && (
+                    <MomentVeld
+                      soort="tijd"
+                      waarde={detail.tijd}
+                      // Een tijd hoort bij een datum (F41).
+                      disabled={!detail.datum}
+                      onChange={(t) => setDetail({ ...detail, tijd: t })}
+                    />
+                  )}
+                  {veldMic('datum')}
+                </div>
+              </div>
+            )}
+            {datum && datumFout && foutRegel}
+            {kenmerken.notitie && (
+              <label className="field">
+                <span>Notitie</span>
+                <span className="tekst-veld notitie-veld">
+                  <textarea
+                    aria-label="Notitie"
+                    rows={3}
+                    maxLength={MAX_NOTITIE}
+                    value={detail.notitie}
+                    onChange={(e) =>
+                      setDetail({
+                        ...detail,
+                        notitie: e.target.value.slice(0, MAX_NOTITIE),
+                      })
+                    }
+                  />
+                  {leegKnop('Notitie weghalen', !detail.notitie, () => setDetail({ ...detail, notitie: '' }))}
+                  {veldMic('notitie')}
+                </span>
+              </label>
+            )}
+            {detailInAgenda && detailItem?.inAgenda && (
+              <p>
+                Staat al in je agenda op {formatWanneer(detailItem.inAgenda, undefined, zonderJaar)}
+                {zonderJaar && ' (elk jaar)'}.
+              </p>
+            )}
+            <div className="confirm-buttons">
+              {datum && (
+                <button
+                  type="button"
+                  className="wide"
+                  // Zonder datum kan het niet; met dezelfde datum zou er een tweede agenda-item komen (F34).
+                  disabled={!detail.datum || Boolean(detailInAgenda)}
+                  onClick={() => saveDetail(true)}
+                >
+                  In agenda zetten
+                </button>
+              )}
+              <button type="button" className="cancel-half" onClick={() => setDetail(null)}>
+                Annuleren
+              </button>
+              <button type="submit" className="confirm-yes">
+                Bewaren
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
     )
   }
 
@@ -820,145 +1036,6 @@ export default function ListView({
             </form>
           </section>
         )}
-        {detail && (detail.id === null || detailItem) && (
-          <section
-            className="confirm clear-choice details"
-            aria-label={detailItem ? `Details van ${detailItem.tekst}` : 'Nieuw item'}
-          >
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                saveDetail(false)
-              }}
-            >
-              <label className="field">
-                <span>Omschr</span>
-                <span className="tekst-veld">
-                  <input
-                    type="text"
-                    aria-label="Tekst"
-                    enterKeyHint="done"
-                    autoComplete="off"
-                    maxLength={MAX_TEKST}
-                    // Een nieuw item: verder typen in dit veld (F42).
-                    autoFocus={detail.id === null}
-                    value={detail.tekst}
-                    onChange={(e) =>
-                      setDetail({
-                        ...detail,
-                        tekst: e.target.value.slice(0, MAX_TEKST),
-                      })
-                    }
-                  />
-                  {veldMic('tekst')}
-                </span>
-              </label>
-              {!datumFout && foutRegel}
-              {kenmerken.aantal && (
-                <label className="field">
-                  <span>Aantal</span>
-                  <span className="tekst-veld">
-                    <input
-                      type="text"
-                      aria-label="Aantal"
-                      placeholder="bijv. 2 of 500 g"
-                      enterKeyHint="done"
-                      autoComplete="off"
-                      maxLength={MAX_AANTAL}
-                      value={detail.aantal}
-                      onChange={(e) =>
-                        setDetail({
-                          ...detail,
-                          aantal: e.target.value.slice(0, MAX_AANTAL),
-                        })
-                      }
-                    />
-                    {veldMic('aantal')}
-                  </span>
-                </label>
-              )}
-              {datum && (
-                // Datum en tijd op één regel; tikken op een veld opent de kiezer van de telefoon (F33).
-                <div className="field">
-                  <span>Datum</span>
-                  <div className={tijd ? 'date-field met-tijd' : 'date-field'}>
-                    <MomentVeld
-                      soort="datum"
-                      zonderJaar={zonderJaar}
-                      waarde={detail.datum}
-                      onChange={(datum) => setDetail({ ...detail, datum })}
-                    />
-                    {tijd && (
-                      <MomentVeld
-                        soort="tijd"
-                        waarde={detail.tijd}
-                        // Een tijd hoort bij een datum (F41).
-                        disabled={!detail.datum}
-                        onChange={(t) => setDetail({ ...detail, tijd: t })}
-                      />
-                    )}
-                    {veldMic('datum')}
-                    <button
-                      type="button"
-                      className="date-clear"
-                      aria-label={tijd ? 'Datum en tijd weghalen' : 'Datum weghalen'}
-                      disabled={!detail.datum && !detail.tijd}
-                      onClick={() => setDetail({ ...detail, datum: '', tijd: '' })}
-                    >
-                      <X size={18} strokeWidth={1.75} aria-hidden />
-                    </button>
-                  </div>
-                </div>
-              )}
-              {datum && datumFout && foutRegel}
-              {kenmerken.notitie && (
-                <label className="field">
-                  <span>Notitie</span>
-                  <span className="tekst-veld notitie-veld">
-                    <textarea
-                      aria-label="Notitie"
-                      rows={3}
-                      maxLength={MAX_NOTITIE}
-                      value={detail.notitie}
-                      onChange={(e) =>
-                        setDetail({
-                          ...detail,
-                          notitie: e.target.value.slice(0, MAX_NOTITIE),
-                        })
-                      }
-                    />
-                    {veldMic('notitie')}
-                  </span>
-                </label>
-              )}
-              {detailInAgenda && detailItem?.inAgenda && (
-                <p>
-                  Staat al in je agenda op {formatWanneer(detailItem.inAgenda, undefined, zonderJaar)}
-                  {zonderJaar && ' (elk jaar)'}.
-                </p>
-              )}
-              <div className="confirm-buttons">
-                {datum && (
-                  <button
-                    type="button"
-                    className="wide"
-                    // Zonder datum kan het niet; met dezelfde datum zou er een tweede agenda-item komen (F34).
-                    disabled={!detail.datum || Boolean(detailInAgenda)}
-                    onClick={() => saveDetail(true)}
-                  >
-                    In agenda zetten
-                  </button>
-                )}
-                <button type="button" className="cancel-half" onClick={() => setDetail(null)}>
-                  Annuleren
-                </button>
-                <button type="submit" className="confirm-yes">
-                  Bewaren
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
         {choosing && (
           <section className="confirm clear-choice agenda-choice" aria-label="Agenda kiezen">
             <strong>{choosing.voor ? 'In welke agenda?' : `Agenda voor ${lijstje.naam}`}</strong>
@@ -1008,7 +1085,7 @@ export default function ListView({
 
       <ul
         ref={list}
-        className="items"
+        className={detail ? 'items kaartje-open' : 'items'}
         aria-label={`Items op ${lijstje.naam}`}
         // Na verplaatsen schuiven de regels nog even naar hun plek; daarna opnieuw tellen (F29).
         onTransitionEnd={scroll.measure}
@@ -1027,68 +1104,76 @@ export default function ListView({
             opDatum={datum}
             kenmerken={kenmerken}
             onOpen={metKenmerken ? () => openDetail(item) : null}
+            vak={detail?.id === item.id && itemVak()}
           />
         ))}
         {/* De invoerregel staat als laatste regel in het lijstje (F3, F15). */}
-        <li
-          ref={addRow}
-          className={hidden.below > 0 ? 'item add-row covering' : 'item add-row'}
-          style={{ bottom: scroll.bottomHeight }}
-        >
-          <MoreBelow count={hidden.below} words={['item', 'items']} onClick={() => scroll.scrollPage(1)} />
-          <span className="item-grip" aria-hidden />
-          <span className="item-check" aria-hidden>
-            <span className="check" />
-          </span>
-          <form className="add-item" onSubmit={submit}>
-            <input
-              ref={input}
-              type="text"
-              aria-label="Item toevoegen"
-              placeholder="Item toevoegen"
-              enterKeyHint="enter"
-              autoComplete="off"
-              value={text}
-              // Elk item mag maximaal 60 tekens hebben, ook als je er meerdere met komma's typt (F3, F4). Met kenmerken
-              // opent het eerste teken het vak Nieuw item, waarin je verder typt (F42).
-              onChange={(e) => {
-                if (metKenmerken && e.target.value.trim()) {
-                  setText('')
-                  startNew(e.target.value)
-                } else setText(limitTyped(e.target.value))
-              }}
-              // Met kenmerken opent tikken in de invoerregel meteen het vak Nieuw item (F42).
-              onClick={() => {
-                if (metKenmerken && detail === null) startNew('')
-              }}
-            />
-            {mic.show && (
-              <button
-                type="button"
-                className={mic.listening ? 'icon-button mic listening' : 'icon-button mic'}
-                aria-label={mic.listening ? 'Stoppen met luisteren' : 'Inspreken'}
-                aria-pressed={mic.listening}
-                onClick={() => {
-                  // Inspreken haalt de melding bij wat je typte weg (AC43).
-                  if (mic.listening) mic.stop()
-                  else if (metKenmerken) {
-                    // Met kenmerken opent het vak Nieuw item en wat je zegt, komt in Omschr (F46).
-                    if (fout) onCloseNotice()
-                    startNew('')
-                    setDicteert('tekst')
-                    mic.start((t) => gezegd('tekst', t))
-                  } else {
-                    if (fout) onCloseNotice()
-                    mic.start()
-                  }
+        {detail?.id === null ? (
+          // Het kaartje van het nieuwe item: de invoerregel schuift open (F42).
+          <li ref={addRow} className="item add-row open">
+            {itemVak()}
+          </li>
+        ) : (
+          <li
+            ref={addRow}
+            className={hidden.below > 0 ? 'item add-row covering' : 'item add-row'}
+            style={{ bottom: scroll.bottomHeight }}
+          >
+            <MoreBelow count={hidden.below} words={['item', 'items']} onClick={() => scroll.scrollPage(1)} />
+            <span className="item-grip" aria-hidden />
+            <span className="item-check" aria-hidden>
+              <span className="check" />
+            </span>
+            <form className="add-item" onSubmit={submit}>
+              <input
+                ref={input}
+                type="text"
+                aria-label="Item toevoegen"
+                placeholder="Item toevoegen"
+                enterKeyHint="enter"
+                autoComplete="off"
+                value={text}
+                // Elk item mag maximaal 60 tekens hebben, ook als je er meerdere met komma's typt (F3, F4). Met kenmerken
+                // opent het eerste teken het vak Nieuw item, waarin je verder typt (F42).
+                onChange={(e) => {
+                  if (metKenmerken && e.target.value.trim()) {
+                    setText('')
+                    startNew(e.target.value)
+                  } else setText(limitTyped(e.target.value))
                 }}
-              >
-                <Mic size={16} strokeWidth={2} aria-hidden />
-              </button>
-            )}
-          </form>
-          {!foutInVak && !notice?.itemId && foutRegel}
-        </li>
+                // Met kenmerken opent tikken in de invoerregel meteen het vak Nieuw item (F42).
+                onClick={() => {
+                  if (metKenmerken) startNew('')
+                }}
+              />
+              {mic.show && (
+                <button
+                  type="button"
+                  className={mic.listening ? 'icon-button mic listening' : 'icon-button mic'}
+                  aria-label={mic.listening ? 'Stoppen met luisteren' : 'Inspreken'}
+                  aria-pressed={mic.listening}
+                  onClick={() => {
+                    // Inspreken haalt de melding bij wat je typte weg (AC43).
+                    if (mic.listening) mic.stop()
+                    else if (metKenmerken) {
+                      // Met kenmerken opent het vak Nieuw item en wat je zegt, komt in Omschr (F46).
+                      if (fout) onCloseNotice()
+                      startNew('')
+                      setDicteert('tekst')
+                      mic.start((t) => gezegd('tekst', t))
+                    } else {
+                      if (fout) onCloseNotice()
+                      mic.start()
+                    }
+                  }}
+                >
+                  <Mic size={16} strokeWidth={2} aria-hidden />
+                </button>
+              )}
+            </form>
+            {!foutInVak && !notice?.itemId && foutRegel}
+          </li>
+        )}
       </ul>
 
       <div ref={bottom} className="bottom">
