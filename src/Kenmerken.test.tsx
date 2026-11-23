@@ -651,6 +651,19 @@ describe('AC47: kaartje met kruisjes', () => {
     expect(within(rows).queryByText('2 liter')).not.toBeInTheDocument()
     expect(within(rows).queryByText('halfvol')).not.toBeInTheDocument()
   })
+
+  it('het tekstveld van het item heeft ook een kruisje; leeg bewaren laat de tekst zoals hij was', async () => {
+    const user = userEvent.setup()
+    storeLists([list('a', 'AH', ['melk'])], 'a')
+    render(<App />)
+    await kenmerken(user, 'AH', ['Aantal'])
+    const box = await openDetails(user, 'melk')
+    await user.click(within(box).getByRole('button', { name: 'Tekst weghalen' }))
+    expect(within(box).getByLabelText('Tekst')).toHaveValue('')
+    expect(within(box).getByRole('button', { name: 'Tekst weghalen' })).toBeDisabled()
+    await user.click(within(box).getByRole('button', { name: 'Bewaren' }))
+    expect(itemTexts()).toEqual(['melk'])
+  })
 })
 
 describe('AC45: vak Nieuw item meteen open', () => {

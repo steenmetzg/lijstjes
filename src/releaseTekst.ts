@@ -12,6 +12,8 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  '1.8.1':
+    'Op een lijstje met kenmerken schuift het kaartje van een item nu open in het lijstje zelf, ook voor een nieuw item. Elk veld heeft een kruisje om het leeg te maken.',
   '1.8.0':
     'Op een lijstje met kenmerken schuift het kaartje van een item nu open in het lijstje zelf, ook voor een nieuw item. Aantal en Notitie hebben een kruisje om het veld leeg te maken.',
   '1.7.12':
