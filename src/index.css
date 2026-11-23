@@ -98,15 +98,11 @@ h1 {
 }
 
 .count-verlopen {
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  /* Even groot als het blauwe rondje (.count). */
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
   background: #b91c1c;
   color: #fff;
 }
