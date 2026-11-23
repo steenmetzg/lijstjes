@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import ConfirmDialog from './ConfirmDialog'
 import type { Notice } from './ListView'
-import { itemsText, MAX_NAAM, nameError, openCount, type Lijstje } from './lists'
+import { itemsText, MAX_NAAM, nameError, openCount, verlopenCount, type Lijstje } from './lists'
 import { MoreAbove, MoreBelow } from './MoreItems'
 import { useScrollList, type Grip } from './scrollList'
 
@@ -88,7 +88,9 @@ function ListRow({
   fout,
 }: RowProps) {
   const [naam, setNaam] = useState(lijstje.naam)
-  const open = openCount(lijstje)
+  // Blauw de open items die niet verlopen zijn, rood de verlopen items: samen het aantal open items (F9).
+  const verlopen = verlopenCount(lijstje)
+  const open = openCount(lijstje) - verlopen
 
   /** Bewaart de nieuwe naam; bij een fout blijft het veld open met de melding onderaan (F11). */
   function save(e: FormEvent) {
@@ -150,14 +152,20 @@ function ListRow({
         <button
           type="button"
           className="list-open"
-          aria-label={open > 0 ? `${lijstje.naam}, ${open} open` : lijstje.naam}
+          aria-label={[lijstje.naam, open > 0 && `${open} open`, verlopen > 0 && `${verlopen} verlopen`].filter(Boolean).join(', ')}
           aria-current={current ? 'true' : undefined}
           onClick={onOpen}
         >
           <span className="list-name">{lijstje.naam}</span>
-          {open > 0 && (
-            <span className="count" aria-hidden>
-              {open}
+          {verlopen > 0 && (
+            <span className="count-verlopen" aria-hidden>
+              {verlopen}
+            </span>
+          )}
+          {/* Blauw staat altijd rechts; zijn alle open items verlopen, dan houdt een leeg rondje zijn plek vrij (F9). */}
+          {(open > 0 || verlopen > 0) && (
+            <span className={open > 0 ? 'count' : 'count leeg'} aria-hidden>
+              {open > 0 ? open : 0}
             </span>
           )}
         </button>
