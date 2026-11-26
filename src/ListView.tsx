@@ -166,7 +166,7 @@ interface RowProps {
   fout: ReactNode
   onRemove: () => void
   grip: Grip
-  /** Op datum gesorteerd: geen greep om te verplaatsen (F33). */
+  /** Een item met een datum op een lijstje op datum: geen greep om te verplaatsen (F33). */
   opDatum: boolean
   /** De kenmerken die aan staan (Tijd alleen samen met Datum). */
   kenmerken: Required<Kenmerken>
@@ -277,7 +277,7 @@ function ItemRow({
       }}
     >
       {gesorteerd ? (
-        // Op datum gesorteerd; verplaatsen kan dan niet (F33).
+        // Het item staat op datum; verplaatsen kan dan niet (F33).
         <span className="item-grip" aria-hidden />
       ) : (
         <button
@@ -527,7 +527,14 @@ export default function ListView({
   const hasDone = items.some((i) => i.af)
   const input = useRef<HTMLInputElement>(null)
   const invoerKlaarzetten = useRef(false)
-  const scroll = useScrollList(items, datum ? () => {} : onMove)
+  // Met Datum staan de items met een datum vast bovenaan; de items zonder datum versleep je onder elkaar (F28, F33).
+  const vast = datum ? items.filter((i) => i.wanneer).length : 0
+  function verplaats(from: number, to: number) {
+    if (!datum) return onMove(from, to)
+    // Van de plek op het scherm naar de plek in het lijstje: de items met een datum staan er tussendoor.
+    onMove(lijstje.items.indexOf(items[from]), lijstje.items.indexOf(items[to]))
+  }
+  const scroll = useScrollList(items, verplaats, vast)
   const { header, list, addRow, bottom, hidden } = scroll
 
   function submit(e: FormEvent) {
@@ -1317,7 +1324,7 @@ export default function ListView({
             fout={notice?.itemId === item.id && foutRegel}
             onRemove={() => onRemove(item.id)}
             grip={scroll.gripFor(item.id, index)}
-            opDatum={datum}
+            opDatum={datum && !!item.wanneer}
             kenmerken={kenmerken}
             onOpen={metKenmerken ? () => openDetail(item) : null}
             vak={detail?.id === item.id && itemVak()}

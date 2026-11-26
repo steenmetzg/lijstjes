@@ -14,6 +14,8 @@ interface Drag {
   /** Hoe ver de pagina gescrold was bij het vastpakken; het lijstje scrolt mee tijdens het slepen. */
   startScroll: number
   heights: number[]
+  /** Hoger dan deze plek kan de regel niet komen (F28, F33: niet boven de items met een datum). */
+  eerste: number
 }
 
 /** Wat de greep van een regel nodig heeft om te verslepen (F28). */
@@ -33,14 +35,19 @@ const EDGE_SPEED = 14
 /** De nieuwe stand van een versleepte regel, voor de vinger op hoogte `pointerY` (F28). */
 function dragTo(drag: Drag, pointerY: number): Drag {
   const dy = pointerY - drag.startY + window.scrollY - drag.startScroll
-  return { ...drag, dy, to: dropIndex(drag.from, dy, drag.heights) }
+  return { ...drag, dy, to: Math.max(drag.eerste, dropIndex(drag.from, dy, drag.heights)) }
 }
 
 /**
  * De regels `rows` staan in `list` (elk als `li[data-id]`), onder de vaste titelbalk `header` en boven de vaste
  * invoerregel `addRow` en de meldingen `bottom`. `onMove` verplaatst een regel van plek `from` naar `to`.
+ * Een versleepte regel komt nooit hoger dan plek `eerste` (de regels daarboven staan vast, F33).
  */
-export function useScrollList(rows: readonly { id: string }[], onMove: (from: number, to: number) => void) {
+export function useScrollList(
+  rows: readonly { id: string }[],
+  onMove: (from: number, to: number) => void,
+  eerste = 0,
+) {
   const header = useRef<HTMLElement>(null)
   const list = useRef<HTMLUListElement>(null)
   const addRow = useRef<HTMLLIElement>(null)
@@ -144,7 +151,7 @@ export function useScrollList(rows: readonly { id: string }[], onMove: (from: nu
         const lis = list.current?.querySelectorAll<HTMLElement>('li[data-id]') ?? []
         const heights = Array.from(lis, (li) => li.getBoundingClientRect().height)
         pointerY.current = e.clientY
-        setDrag({ id, from: index, to: index, dy: 0, startY: e.clientY, startScroll: window.scrollY, heights })
+        setDrag({ id, from: index, to: index, dy: 0, startY: e.clientY, startScroll: window.scrollY, heights, eerste })
       },
       onPointerMove(e) {
         if (!drag || drag.id !== id) return
@@ -163,7 +170,7 @@ export function useScrollList(rows: readonly { id: string }[], onMove: (from: nu
         const to = e.key === 'ArrowUp' ? index - 1 : e.key === 'ArrowDown' ? index + 1 : null
         if (to === null) return
         e.preventDefault()
-        if (to < 0 || to >= rows.length) return
+        if (to < eerste || to >= rows.length) return
         setMoved(id)
         onMove(index, to)
       },
