@@ -157,11 +157,55 @@ describe('AC15: backup maken en inlezen', () => {
   })
 })
 
+describe('AC15: backupmap die niet antwoordt (1.9.3)', () => {
+  it('zet de backup in Downloads als de telefoon niet antwoordt op de toestemming voor de map', async () => {
+    const user = userEvent.setup()
+    const createObjectURL = vi.fn(() => 'blob:backup')
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }))
+    const folder = fakeFolder('Lijstjes')
+    folder.handle.queryPermission = async () => 'prompt'
+    folder.handle.requestPermission = () => new Promise<string>(() => {})
+    folderMemory.handle = folder.handle
+    win.showDirectoryPicker = vi.fn(async () => folder.handle)
+    render(<App />)
+    await openSettings(user)
+    expect(await screen.findByTestId('backupmap')).toHaveTextContent('Map: Lijstjes')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'], shouldAdvanceTime: true })
+    await user.click(screen.getByRole('button', { name: 'Backup maken' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Backup maken…')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Opslaan in de map "Lijstjes" lukte niet. De backup van 1 lijstje en 0 items staat als 2026-11-06-lijstjes.json in Downloads. Kies de map opnieuw met Map kiezen.',
+    )
+    expect(createObjectURL).toHaveBeenCalledOnce()
+    vi.unstubAllGlobals()
+  })
+
+  it('zet de backup in Downloads als schrijven in de map mislukt', async () => {
+    const user = userEvent.setup()
+    const createObjectURL = vi.fn(() => 'blob:backup')
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }))
+    const folder = fakeFolder('Lijstjes')
+    folder.handle.getFileHandle = async () => {
+      throw new Error('kapot')
+    }
+    folderMemory.handle = folder.handle
+    win.showDirectoryPicker = vi.fn(async () => folder.handle)
+    render(<App />)
+    await openSettings(user)
+    expect(await screen.findByTestId('backupmap')).toHaveTextContent('Map: Lijstjes')
+    await user.click(screen.getByRole('button', { name: 'Backup maken' }))
+    expect(await screen.findByText(/lukte niet/)).toHaveTextContent('staat als 2026-11-06-lijstjes.json in Downloads')
+    expect(createObjectURL).toHaveBeenCalledOnce()
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('AC18: versienummer', () => {
   it('staat onderaan de instellingen, uit package.json', async () => {
     const user = userEvent.setup()
     render(<App />)
     await openSettings(user)
-    expect(screen.getByText('Versie: 1.9.2')).toBeInTheDocument()
+    expect(screen.getByText('Versie: 1.9.3')).toBeInTheDocument()
   })
 })
