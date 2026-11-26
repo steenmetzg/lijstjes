@@ -44,6 +44,26 @@ export async function ensureWriteAccess(folder: FileSystemDirectoryHandle): Prom
   return (await handle.requestPermission({ mode: 'readwrite' })) === 'granted'
 }
 
+/**
+ * Wacht hoogstens `ms` milliseconden op een belofte. Op sommige telefoons (bijv. een Samsung met Chrome)
+ * antwoordt de browser soms nooit op de vraag om toestemming voor een map; dan geeft dit `null`.
+ */
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(null), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+}
+
 export async function writeFileToFolder(folder: FileSystemDirectoryHandle, name: string, text: string) {
   const file = await folder.getFileHandle(name, { create: true })
   const writable = await file.createWritable()

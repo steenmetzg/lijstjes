@@ -12,6 +12,7 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  '1.9.3': 'Backup maken werkt weer. Lukt opslaan in je backupmap niet, dan komt de backup in Downloads.',
   '1.9.2':
     'Op een lijstje met datums kun je items zonder datum nu verslepen. Ze blijven onder de items met een datum.',
   // Alleen Synchroniseren of delen scrolt nu, zodat Bewaren altijd te bereiken is: geen eigen tekst.

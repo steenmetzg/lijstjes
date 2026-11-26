@@ -11,6 +11,7 @@ import {
   ensureWriteAccess,
   isAbortError,
   pickFileInFolder,
+  withTimeout,
   writeFileToFolder,
 } from './files'
 import { loadStoredFolder, storeFolder } from './folderStore'
@@ -26,6 +27,9 @@ interface Props {
   onRestore: (lijstjes: Lijstje[], huidig: string) => void
   onClose: () => void
 }
+
+/** Zo lang wachten we op de map voordat de backup naar Downloads gaat. */
+const FOLDER_TIMEOUT_MS = 5000
 
 type Message = { kind: 'ok' | 'error'; text: string }
 
@@ -65,18 +69,31 @@ export default function Settings({ lijstjes, huidig, speechEnabled, onChangeSpee
     const name = backupFileName(now)
     const text = createBackup(lijstjes, huidig, now)
     if (folder) {
+      setMessage({ kind: 'ok', text: 'Backup maken…' })
+      // Lukt opslaan in de map niet, of antwoordt de telefoon niet, dan gaat de backup naar Downloads (F19).
+      let saved: boolean | null
       try {
-        if (!(await ensureWriteAccess(folder))) {
-          setMessage({ kind: 'error', text: `Geen toestemming voor de map "${folder.name}". Probeer het opnieuw.` })
-          return
-        }
-        await writeFileToFolder(folder, name, text)
+        saved = await withTimeout(
+          (async () => {
+            if (!(await ensureWriteAccess(folder))) return false
+            await writeFileToFolder(folder, name, text)
+            return true
+          })(),
+          FOLDER_TIMEOUT_MS,
+        )
+      } catch {
+        saved = false
+      }
+      if (saved) {
         setMessage({ kind: 'ok', text: `Backup van ${contentCount(lijstjes)} opgeslagen als ${name} in de map "${folder.name}".` })
         return
-      } catch {
-        setMessage({ kind: 'error', text: `Opslaan in de map "${folder.name}" is mislukt. Kies de map opnieuw.` })
-        return
       }
+      downloadFile(name, text)
+      setMessage({
+        kind: 'error',
+        text: `Opslaan in de map "${folder.name}" lukte niet. De backup van ${contentCount(lijstjes)} staat als ${name} in Downloads. Kies de map opnieuw met Map kiezen.`,
+      })
+      return
     }
     downloadFile(name, text)
     setMessage({ kind: 'ok', text: `Backup van ${contentCount(lijstjes)} opgeslagen als ${name} in Downloads.` })
