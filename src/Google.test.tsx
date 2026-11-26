@@ -7,6 +7,7 @@ import App from './App'
 import {
   agendaBody,
   bijwerken,
+  controleer,
   doelen,
   GOOGLE_KEY,
   hashDoel,
@@ -16,7 +17,7 @@ import {
   INGELOGD_KEY,
   type GoogleOpslag,
 } from './google'
-import { KENMERKEN_KEY, mergeHerinneringen, naarGoogle, splitKenmerken, type Lijstje } from './lists'
+import { KENMERKEN_KEY, mergeHerinneringen, naarGoogle, splitKenmerken, zetGoogleUit, type Lijstje } from './lists'
 import { list, storeLists } from './test/helpers'
 
 vi.mock('./folderStore', () => ({
@@ -84,8 +85,8 @@ describe('AC49: met tijd naar Google Agenda, zonder tijd naar Google Tasks', () 
     expect(agendaBody(d.get('t')!, 'Europe/Amsterdam')).toEqual({
       summary: 'tandarts',
       description: 'controle\n\nUit Lijstjes: Afspraken',
-      start: { dateTime: '2026-11-27T09:30:00', timeZone: 'Europe/Amsterdam' },
-      end: { dateTime: '2026-11-27T10:00:00', timeZone: 'Europe/Amsterdam' },
+      start: { dateTime: '2026-11-27T09:30:00', timeZone: 'Europe/Amsterdam', date: null },
+      end: { dateTime: '2026-11-27T10:00:00', timeZone: 'Europe/Amsterdam', date: null },
       recurrence: [],
       reminders: { useDefault: true },
     })
@@ -94,6 +95,22 @@ describe('AC49: met tijd naar Google Agenda, zonder tijd naar Google Tasks', () 
       notes: 'Uit Lijstjes: Afspraken',
       due: '2026-11-28T00:00:00.000Z',
       status: 'needsAction',
+    })
+  })
+})
+
+describe('AC49: zonder jaar altijd in Google Agenda, elk jaar', () => {
+  it('een verjaardag zonder tijd wordt een agenda-item voor de hele dag dat elk jaar terugkomt', () => {
+    const l = afspraken({
+      kenmerken: { datum: true, tijd: true, zonderJaar: true },
+      items: [{ id: 'v', tekst: 'verjaardag Anne', af: false, wanneer: '2000-03-14' }],
+    })
+    const d = doelen([l]).get('v')!
+    expect(d).toMatchObject({ soort: 'agenda', moment: '2027-03-14', jaarlijks: true })
+    expect(agendaBody(d, 'Europe/Amsterdam')).toMatchObject({
+      start: { date: '2027-03-14', dateTime: null },
+      end: { date: '2027-03-15', dateTime: null },
+      recurrence: ['RRULE:FREQ=YEARLY'],
     })
   })
 })
@@ -290,5 +307,65 @@ describe('AC53: Google, automatisch kiezen en inloggen', () => {
     const melding = await screen.findByRole('region', { name: 'Google bijwerken' })
     expect(within(melding).getByText(/Log opnieuw in bij Google/)).toBeInTheDocument()
     expect(within(melding).getByRole('button', { name: 'Inloggen' })).toBeInTheDocument()
+  })
+})
+
+describe('AC54: bij Google zelf verwijderd', () => {
+  it('kijkt na of de items nog bij Google staan', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/a1')) return new Response('{}', { status: 404 })
+        if (url.endsWith('/a2')) return new Response(JSON.stringify({ id: 'a2', status: 'cancelled' }))
+        if (url.endsWith('/t1')) return new Response(JSON.stringify({ id: 't1', deleted: true }))
+        return new Response(JSON.stringify({ id: 'x', status: 'confirmed' }))
+      }),
+    )
+    const opslag: GoogleOpslag = {
+      a: { soort: 'agenda', id: 'a1', hash: '' },
+      b: { soort: 'agenda', id: 'a2', hash: '' },
+      c: { soort: 'tasks', id: 't1', hash: '' },
+      d: { soort: 'tasks', id: 't2', hash: '' },
+    }
+    expect(await controleer('tok', opslag)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('bijwerken van een verwijderd item maakt het niet opnieuw, maar meldt het', async () => {
+    const methods: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        methods.push(init.method!)
+        return new Response('{}', { status: 404 })
+      }),
+    )
+    const l = afspraken()
+    const d = doelen([l]).get('t')!
+    const opslag: GoogleOpslag = { t: { soort: 'agenda', id: 'oud', hash: 'anders' } }
+    const verdwenen: string[][] = []
+    const na = await bijwerken(
+      'tok',
+      [{ ...l, items: [l.items[0]] }],
+      opslag,
+      () => {},
+      (ids) => verdwenen.push(ids),
+    )
+    expect(d.soort).toBe('agenda')
+    expect(methods).toEqual(['PATCH'])
+    expect(na).toEqual({})
+    expect(verdwenen).toEqual([['t']])
+  })
+
+  it('de schakelaar van zo een item gaat uit', () => {
+    const [l] = zetGoogleUit([afspraken()], ['t'])
+    expect(l.items[0].google).toBe(false)
+    expect(naarGoogle(l, l.items[0])).toBe(false)
+    expect(naarGoogle(l, l.items[1])).toBe(true)
+    // Met Alle items uit stond het item zelf aan; dat gaat er weer af.
+    const [m] = zetGoogleUit(
+      [afspraken({ googleAlle: false, items: [{ ...afspraken().items[0], google: true }] })],
+      ['t'],
+    )
+    expect(m.items[0].google).toBeUndefined()
   })
 })

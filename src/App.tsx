@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Info from './Info'
 import { useInstallPrompt } from './installPrompt'
 import Lists, { type Deleted } from './Lists'
@@ -17,6 +17,7 @@ import {
   heeftZonderJaar,
   saveCurrent,
   saveLijstjes,
+  zetGoogleUit,
   capitalize,
   MAX_TEKST,
   sameText,
@@ -67,7 +68,9 @@ export default function App() {
   )
   const lijstje = lijstjes.find((l) => l.id === huidig) ?? lijstjes[0]
   // Google Agenda en Google Tasks gelijk houden met de lijstjes (F48, F49).
-  const google = useGoogle(lijstjes)
+  // Bij het openen van een lijstje: items die je bij Google zelf hebt verwijderd, gaan uit (F48).
+  const googleVerdwenen = useCallback((ids: string[]) => setLijstjes((all) => zetGoogleUit(all, ids)), [])
+  const google = useGoogle(lijstjes, screen === 'lijst' ? (lijstje?.id ?? null) : null, googleVerdwenen)
   const [googleMeldingWeg, setGoogleMeldingWeg] = useState(false)
   useEffect(() => {
     if (!google.inloggenNodig) setGoogleMeldingWeg(false)

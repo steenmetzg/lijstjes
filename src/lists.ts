@@ -62,6 +62,22 @@ export function naarGoogle(l: Lijstje, item: Item): boolean {
   return item.google ?? l.googleAlle !== false
 }
 
+/** Items die je bij Google zelf hebt verwijderd: de schakelaar In Google gaat uit (F48). */
+export function zetGoogleUit(lijstjes: Lijstje[], itemIds: readonly string[]): Lijstje[] {
+  return lijstjes.map((l) =>
+    l.items.some((i) => itemIds.includes(i.id))
+      ? {
+          ...l,
+          items: l.items.map((i) => {
+            if (!itemIds.includes(i.id)) return i
+            const { google: _, ...rest } = i
+            return l.googleAlle === false ? rest : { ...rest, google: false }
+          }),
+        }
+      : l,
+  )
+}
+
 /** Staat Datum aan? Tijd telt alleen samen met Datum (F41). */
 export function heeftDatum(l: Lijstje): boolean {
   return l.kenmerken?.datum === true

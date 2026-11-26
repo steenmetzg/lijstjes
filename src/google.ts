@@ -55,9 +55,12 @@ export type Actie =
   | { soort: 'wijzig'; itemId: string; doel: Doel; gezet: Gezet }
   | { soort: 'weg'; itemId: string; gezet: Gezet }
 
-/** Met een tijd in Google Agenda, met alleen een datum in Google Tasks (F48). */
-export function soortVan(moment: string): Soort {
-  return heeftTijdDeel(moment) ? 'agenda' : 'tasks'
+/**
+ * Met een tijd in Google Agenda, met alleen een datum in Google Tasks (F48). Zonder jaar (zoals een verjaardag) altijd
+ * in Google Agenda, want alleen daar komt het elk jaar terug.
+ */
+export function soortVan(moment: string, jaarlijks = false): Soort {
+  return jaarlijks || heeftTijdDeel(moment) ? 'agenda' : 'tasks'
 }
 
 /** Hoe alle items die naar Google horen er daar uit moeten zien, per item-id (F48). */
@@ -71,7 +74,7 @@ export function doelen(lijstjes: readonly Lijstje[], now: Date = new Date()): Ma
       const zien = zichtbaar(item.wanneer, tijd)
       const notitie = l.kenmerken?.notitie ? item.notitie : undefined
       result.set(item.id, {
-        soort: soortVan(zien),
+        soort: soortVan(zien, jaarlijks),
         titel: item.aantal && l.kenmerken?.aantal ? `${item.aantal} ${item.tekst}` : item.tekst,
         ...(notitie && { notitie }),
         lijstje: l.naam,
@@ -142,15 +145,28 @@ function lokaal(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`
 }
 
-/** Een agenda-item van een half uur, met de standaardmeldingen van je agenda (F48). */
+/**
+ * Een agenda-item van een half uur, of zonder tijd een item voor de hele dag, met de standaardmeldingen van je agenda
+ * (F48). Het andere veld (`date` of `dateTime`) staat op `null`, zodat bijwerken van tijd naar hele dag ook werkt.
+ */
 export function agendaBody(d: Doel, tz: string = tijdzone()) {
   const start = toDate(d.moment)
-  const eind = new Date(start.getTime() + DUUR_MINUTEN * 60000)
+  const tijden = heeftTijdDeel(d.moment)
+    ? {
+        start: { dateTime: lokaal(start), timeZone: tz, date: null },
+        end: { dateTime: lokaal(new Date(start.getTime() + DUUR_MINUTEN * 60000)), timeZone: tz, date: null },
+      }
+    : {
+        start: { date: lokaal(start).slice(0, 10), dateTime: null },
+        end: {
+          date: lokaal(new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1)).slice(0, 10),
+          dateTime: null,
+        },
+      }
   return {
     summary: d.titel,
     description: beschrijving(d),
-    start: { dateTime: lokaal(start), timeZone: tz },
-    end: { dateTime: lokaal(eind), timeZone: tz },
+    ...tijden,
     recurrence: d.jaarlijks ? ['RRULE:FREQ=YEARLY'] : [],
     reminders: { useDefault: true },
   }
@@ -199,8 +215,11 @@ async function maak(token: string, doel: Doel): Promise<Gezet> {
   return { soort: doel.soort, id: res.id, hash: hashDoel(doel) }
 }
 
-/** Voert één actie uit bij Google en geeft wat er daarna staat (`null`: niets meer). */
-export async function voerUit(token: string, actie: Actie): Promise<Gezet | null> {
+/**
+ * Voert één actie uit bij Google en geeft wat er daarna staat (`null`: niets meer; `'verdwenen'`: het item is bij
+ * Google zelf verwijderd, F48).
+ */
+export async function voerUit(token: string, actie: Actie): Promise<Gezet | null | 'verdwenen'> {
   if (actie.soort === 'maak') return maak(token, actie.doel)
   const url = `${actie.gezet.soort === 'agenda' ? AGENDA_URL : TASKS_URL}/${encodeURIComponent(actie.gezet.id)}`
   if (actie.soort === 'weg') {
@@ -216,8 +235,8 @@ export async function voerUit(token: string, actie: Actie): Promise<Gezet | null
     await roep(token, 'PATCH', url, actie.doel.soort === 'agenda' ? agendaBody(actie.doel) : taakBody(actie.doel))
     return { ...actie.gezet, hash: hashDoel(actie.doel) }
   } catch (e) {
-    // Bij Google verwijderd: opnieuw maken.
-    if (e instanceof GoogleFout && weg(e.status)) return maak(token, actie.doel)
+    // Bij Google zelf verwijderd: niet opnieuw maken (F48).
+    if (e instanceof GoogleFout && weg(e.status)) return 'verdwenen'
     throw e
   }
 }
@@ -246,23 +265,57 @@ export function saveOpslag(opslag: GoogleOpslag): void {
   }
 }
 
-/** Brengt Google gelijk met Lijstjes. Een 401 (opnieuw inloggen) of een netwerkfout gaat door naar de aanroeper. */
+/**
+ * Brengt Google gelijk met Lijstjes. Een 401 (opnieuw inloggen) of een netwerkfout gaat door naar de aanroeper.
+ * `onVerdwenen`: items die bij Google zelf zijn verwijderd; die zet Lijstjes uit in plaats van opnieuw te maken (F48).
+ */
 export async function bijwerken(
   token: string,
   lijstjes: readonly Lijstje[],
   opslag: GoogleOpslag,
   onStap: (opslag: GoogleOpslag) => void,
+  onVerdwenen: (itemIds: string[]) => void = () => {},
   now: Date = new Date(),
 ): Promise<GoogleOpslag> {
   let huidig = { ...opslag }
+  const verdwenen: string[] = []
   for (const actie of plan(doelen(lijstjes, now), huidig)) {
+    if (verdwenen.includes(actie.itemId)) continue
     const gezet = await voerUit(token, actie)
     huidig = { ...huidig }
-    if (gezet) huidig[actie.itemId] = gezet
+    if (gezet === 'verdwenen') {
+      delete huidig[actie.itemId]
+      verdwenen.push(actie.itemId)
+    } else if (gezet) huidig[actie.itemId] = gezet
     else if (actie.soort === 'weg' && huidig[actie.itemId]?.id === actie.gezet.id) delete huidig[actie.itemId]
     onStap(huidig)
   }
+  if (verdwenen.length > 0) onVerdwenen(verdwenen)
   return huidig
+}
+
+/**
+ * Staat dit item nog bij Google? Nee als Google 404 of 410 geeft, of het als verwijderd (agenda: `cancelled`, taak:
+ * `deleted`) teruggeeft. Andere fouten (401, geen internet) gaan door naar de aanroeper.
+ */
+export async function staatNogInGoogle(token: string, gezet: Gezet): Promise<boolean> {
+  const url = `${gezet.soort === 'agenda' ? AGENDA_URL : TASKS_URL}/${encodeURIComponent(gezet.id)}`
+  try {
+    const res = (await roep(token, 'GET', url)) as { status?: string; deleted?: boolean } | null
+    return res?.status !== 'cancelled' && res?.deleted !== true
+  } catch (e) {
+    if (e instanceof GoogleFout && weg(e.status)) return false
+    throw e
+  }
+}
+
+/** Kijkt bij het openen van de app (en als je terugkomt) welke items je bij Google zelf hebt verwijderd (F48). */
+export async function controleer(token: string, opslag: GoogleOpslag): Promise<string[]> {
+  const verdwenen: string[] = []
+  for (const [itemId, gezet] of Object.entries(opslag)) {
+    if (!(await staatNogInGoogle(token, gezet))) verdwenen.push(itemId)
+  }
+  return verdwenen
 }
 
 // --- Inloggen (F49) met Google Identity Services: een token dat een uur geldt, zonder server. ---
