@@ -38,6 +38,8 @@ export interface GoogleStaat {
   uitloggen: () => void
   /** Bij een tik op een lijstje met Google, automatisch: is de toegang verlopen, dan meteen opnieuw vragen. */
   bijTik: () => void
+  /** Deze items in Google laten staan, maar niet meer bijhouden (bij het omzetten van het lijstje, F48). */
+  vergeet: (itemIds: readonly string[]) => void
 }
 
 /**
@@ -161,6 +163,14 @@ export function useGoogle(
     setIngelogd(false)
   }, [])
 
+  const vergeet = useCallback((itemIds: readonly string[]) => {
+    const nieuw = { ...actueel.current.opslag }
+    for (const id of itemIds) delete nieuw[id]
+    saveOpslag(nieuw)
+    actueel.current.opslag = nieuw
+    setOpslag(nieuw)
+  }, [])
+
   const bijTik = useCallback(() => {
     if (ingelogd && googleClientId() && !loadToken()) void inloggen()
   }, [ingelogd, inloggen])
@@ -173,5 +183,6 @@ export function useGoogle(
     inloggen,
     uitloggen,
     bijTik,
+    vergeet,
   }
 }
