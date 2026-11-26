@@ -53,6 +53,8 @@ export interface Gezet {
   takenlijst?: string
   /** Bij een taak in de eigen takenlijst: afgevinkt zoals Lijstjes het daar het laatst zette (F52). */
   af?: boolean
+  /** In Google Tasks verwijderd: het item is in Lijstjes afgevinkt; zet je het weer open, dan komt het terug (F52). */
+  verwijderd?: true
 }
 
 /** Achter het item-id: de taak in de eigen takenlijst van het lijstje (F52). */
@@ -163,6 +165,12 @@ export function plan(gewenst: Map<string, Doel>, opslag: GoogleOpslag): Actie[] 
   for (const [itemId, gezet] of Object.entries(opslag)) {
     if (itemId.startsWith(LIJST_PREFIX)) continue
     const doel = gewenst.get(itemId)
+    if (gezet.verwijderd) {
+      // In Google Tasks verwijderd (F52): weer open gezet in Lijstjes, dan opnieuw maken; anders niets.
+      if (!doel) acties.push({ soort: 'weg', itemId, gezet })
+      else if (!doel.af) acties.push({ soort: 'maak', itemId, doel })
+      continue
+    }
     if (!doel) acties.push({ soort: 'weg', itemId, gezet })
     else if (doel.soort !== gezet.soort) {
       acties.push({ soort: 'weg', itemId, gezet })
@@ -291,6 +299,7 @@ export async function voerUit(token: string, actie: Actie): Promise<Gezet | null
   if (actie.soort === 'maak') return maak(token, actie.doel)
   const url = `${actie.gezet.soort === 'agenda' ? AGENDA_URL : takenUrl(actie.gezet.takenlijst)}/${encodeURIComponent(actie.gezet.id)}`
   if (actie.soort === 'weg') {
+    if (actie.gezet.verwijderd) return null
     try {
       await roep(token, 'DELETE', url)
     } catch (e) {
@@ -326,6 +335,7 @@ export function loadOpslag(): GoogleOpslag {
           hash: g.hash,
           ...(typeof g.takenlijst === 'string' && { takenlijst: g.takenlijst }),
           ...(typeof g.af === 'boolean' && { af: g.af }),
+          ...(g.verwijderd === true && { verwijderd: true as const }),
         }
       }
     }
@@ -436,6 +446,7 @@ export interface Taak {
   title?: string
   status?: string
   due?: string
+  notes?: string
   deleted?: boolean
 }
 
@@ -452,19 +463,45 @@ export async function haalTakenOp(token: string, takenlijst: string): Promise<Ta
   return result
 }
 
+/** Een wijziging in de eigen takenlijst bij Google die terug moet naar een item in Lijstjes (F52). */
+export interface Terug {
+  itemId: string
+  af?: boolean
+  tekst?: string
+  aantal?: string
+  notitie?: string
+}
+
 /** Wat er in de eigen takenlijst bij Google anders is dan Lijstjes het daar zette (F52). */
 export interface VanGoogle {
-  /** In Google afgevinkt of weer open gezet. */
-  af: { itemId: string; af: boolean }[]
+  /** In Google afgevinkt, weer open gezet, of de titel of notitie gewijzigd; of verwijderd (dan afgevinkt). */
+  wijzig: Terug[]
   /** In Google nieuw toegevoegd. */
   nieuw: Taak[]
-  /** In Google verwijderd: Lijstjes zet ze er weer in (het lijstje is leidend). */
+  /** In Google verwijderd: in Lijstjes afgevinkt, en niet opnieuw in Google gezet. */
   weg: string[]
+}
+
+/** Wat Lijstjes het laatst als titel en notitie naar Google stuurde (uit de hash, F52); `null` als dat niet bekend is. */
+function laatstGestuurd(gezet: Gezet): { titel: string; notitie: string } | null {
+  try {
+    const h = JSON.parse(gezet.hash) as unknown
+    return Array.isArray(h) && typeof h[1] === 'string' && typeof h[2] === 'string'
+      ? { titel: h[1], notitie: h[2] }
+      : null
+  } catch {
+    return null
+  }
+}
+
+/** De notitie uit de notities bij Google, zonder "Uit Lijstjes: …" eronder. */
+function notitieUit(notes: string | undefined): string {
+  return (notes ?? '').replace(/\s*Uit Lijstjes: [^\n]*$/, '').trim()
 }
 
 export function vergelijkTaken(l: Lijstje, opslag: GoogleOpslag, taken: readonly Taak[]): VanGoogle {
   const takenlijst = opslag[LIJST_PREFIX + l.id]?.id
-  const result: VanGoogle = { af: [], nieuw: [], weg: [] }
+  const result: VanGoogle = { wijzig: [], nieuw: [], weg: [] }
   if (!takenlijst) return result
   const perId = new Map(taken.filter((t) => !t.deleted).map((t) => [t.id, t]))
   const bekend = new Set(
@@ -475,14 +512,27 @@ export function vergelijkTaken(l: Lijstje, opslag: GoogleOpslag, taken: readonly
   for (const item of l.items) {
     const key = item.id + IN_LIJST
     const gezet = opslag[key]
-    if (!gezet || gezet.takenlijst !== takenlijst) continue
+    if (!gezet || gezet.takenlijst !== takenlijst || gezet.verwijderd) continue
     const taak = perId.get(gezet.id)
     if (!taak) {
       result.weg.push(key)
+      if (!item.af) result.wijzig.push({ itemId: item.id, af: true })
       continue
     }
+    const terug: Terug = { itemId: item.id }
     const af = taak.status === 'completed'
-    if (af !== (gezet.af ?? false) && af !== item.af) result.af.push({ itemId: item.id, af })
+    if (af !== (gezet.af ?? false) && af !== item.af) terug.af = af
+    const gestuurd = laatstGestuurd(gezet)
+    const titel = (taak.title ?? '').trim()
+    if (gestuurd && titel && titel !== gestuurd.titel) {
+      // Met Aantal: een getal vooraan is het aantal (F41).
+      const m = l.kenmerken?.aantal ? /^(\d\S*)\s+(.+)$/.exec(titel) : null
+      terug.tekst = m ? m[2] : titel
+      if (l.kenmerken?.aantal) terug.aantal = m ? m[1] : ''
+    }
+    const notitie = notitieUit(taak.notes)
+    if (gestuurd && l.kenmerken?.notitie && notitie !== gestuurd.notitie) terug.notitie = notitie
+    if (Object.keys(terug).length > 1) result.wijzig.push(terug)
   }
   result.nieuw = taken.filter((t) => !t.deleted && !bekend.has(t.id) && t.title?.trim())
   return result

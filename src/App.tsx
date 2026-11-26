@@ -20,6 +20,8 @@ import {
   zetGoogleUit,
   zetInAgendaGezet,
   capitalize,
+  MAX_AANTAL,
+  MAX_NOTITIE,
   MAX_TEKST,
   sameText,
   setDetails,
@@ -33,6 +35,7 @@ import {
 } from './lists'
 import { GOOGLE_AUTO, isAgenda, PER_ITEM, volgendeKeer, zetInAgenda, zichtbaar, type AgendaKeuze } from './agenda'
 import GoogleMelding from './GoogleMelding'
+import type { Terug } from './google'
 import { useGoogle } from './useGoogle'
 import NewVersion, { Welkom } from './NewVersion'
 import { markVersionSeen, versionToAnnounce, welkomGezien, welkomTonen } from './newVersion'
@@ -74,7 +77,7 @@ export default function App() {
   const googleVerdwenen = useCallback((ids: string[]) => setLijstjes((all) => zetGoogleUit(all, ids)), [])
   // Het hele lijstje in Google Tasks: in Google afgevinkt of nieuw toegevoegd komt terug in Lijstjes (F52).
   const googleVanLijst = useCallback(
-    (lijstjeId: string, af: { itemId: string; af: boolean }[], nieuw: Item[]) =>
+    (lijstjeId: string, wijzig: Terug[], nieuw: Item[]) =>
       setLijstjes((all) =>
         all.map((l) =>
           l.id !== lijstjeId
@@ -83,8 +86,18 @@ export default function App() {
                 ...l,
                 items: [
                   ...l.items.map((i) => {
-                    const w = af.find((x) => x.itemId === i.id)
-                    return w ? { ...i, af: w.af } : i
+                    const w = wijzig.find((x) => x.itemId === i.id)
+                    if (!w) return i
+                    const { aantal: _a, notitie: _n, ...rest } = i
+                    const aantal = w.aantal !== undefined ? w.aantal.slice(0, MAX_AANTAL) : i.aantal
+                    const notitie = w.notitie !== undefined ? w.notitie.slice(0, MAX_NOTITIE) : i.notitie
+                    return {
+                      ...rest,
+                      ...(w.af !== undefined && { af: w.af }),
+                      ...(w.tekst && { tekst: w.tekst.slice(0, MAX_TEKST) }),
+                      ...(aantal && { aantal }),
+                      ...(notitie && { notitie }),
+                    }
                   }),
                   ...nieuw,
                 ],

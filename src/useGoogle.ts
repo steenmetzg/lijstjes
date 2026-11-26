@@ -11,6 +11,7 @@ import {
   LIJST_PREFIX,
   IN_LIJST,
   vergelijkTaken,
+  type Terug,
   werkNodig,
   googleClientId,
   GoogleFout,
@@ -53,7 +54,7 @@ export function useGoogle(
   lijstjes: readonly Lijstje[],
   open: string | null = null,
   onVerdwenen: (itemIds: string[]) => void = () => {},
-  onVanGoogle: (lijstjeId: string, af: { itemId: string; af: boolean }[], nieuw: Item[]) => void = () => {},
+  onVanGoogle: (lijstjeId: string, wijzig: Terug[], nieuw: Item[]) => void = () => {},
 ): GoogleStaat {
   const [opslag, setOpslag] = useState<GoogleOpslag>(loadOpslag)
   const [ingelogd, setIngelogd] = useState(isIngelogd)
@@ -107,9 +108,12 @@ export function useGoogle(
       if (lijstje && takenlijst) {
         const van = vergelijkTaken(lijstje, actueel.current.opslag, await haalTakenOp(token, takenlijst))
         const nieuw = { ...actueel.current.opslag }
-        // In Google verwijderd: opnieuw maken.
-        for (const key of van.weg) delete nieuw[key]
-        for (const { itemId, af } of van.af) nieuw[itemId + IN_LIJST] = { ...nieuw[itemId + IN_LIJST], af }
+        // In Google verwijderd: in Lijstjes afgevinkt, en niet opnieuw in Google.
+        for (const key of van.weg) nieuw[key] = { ...nieuw[key], verwijderd: true }
+        for (const { itemId, af } of van.wijzig) {
+          if (af !== undefined && !van.weg.includes(itemId + IN_LIJST))
+            nieuw[itemId + IN_LIJST] = { ...nieuw[itemId + IN_LIJST], af }
+        }
         const nieuweItems: Item[] = van.nieuw.map((t) => {
           const item: Item = {
             id: newId(),
@@ -120,10 +124,10 @@ export function useGoogle(
           nieuw[item.id + IN_LIJST] = { soort: 'tasks', id: t.id, hash: '', takenlijst, af: item.af }
           return item
         })
-        if (van.weg.length + van.af.length + nieuweItems.length > 0) bewaar(nieuw)
-        if (van.af.length + nieuweItems.length > 0) {
+        if (van.weg.length + van.wijzig.length + nieuweItems.length > 0) bewaar(nieuw)
+        if (van.wijzig.length + nieuweItems.length > 0) {
           // Eerst Lijstjes bijwerken; de volgende ronde werkt Google bij met de nieuwe lijstjes.
-          actueel.current.onVanGoogle(lijstje.id, van.af, nieuweItems)
+          actueel.current.onVanGoogle(lijstje.id, van.wijzig, nieuweItems)
           return
         }
       }
