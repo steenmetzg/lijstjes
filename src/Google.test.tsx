@@ -523,22 +523,51 @@ describe('AC56: het hele lijstje in Google Tasks', () => {
     expect(uit.t?.soort).toBe('agenda')
   })
 
-  it('vanuit Google: afvinken, nieuwe taken en verwijderde taken', () => {
+  it('vanuit Google: afvinken, tekst en notitie, nieuwe taken en verwijderde taken', () => {
+    const l = heel({
+      kenmerken: { datum: true, tijd: true, notitie: true, aantal: true },
+      items: [...afspraken().items, { id: 'm', tekst: 'melk', af: false, aantal: '2' }],
+    })
+    const d = doelen([l], undefined, metLijst)
+    const gezet = (id: string, key: string) => ({
+      soort: 'tasks' as const,
+      id,
+      hash: hashDoel(d.get(key)!),
+      takenlijst: 'L1',
+      af: false,
+    })
     const opslag: GoogleOpslag = {
       ...metLijst,
-      't#lijst': { soort: 'tasks', id: 'a', hash: '', takenlijst: 'L1', af: false },
-      'p#lijst': { soort: 'tasks', id: 'b', hash: '', takenlijst: 'L1', af: false },
-      'c#lijst': { soort: 'tasks', id: 'c', hash: '', takenlijst: 'L1', af: false },
+      't#lijst': gezet('a', 't#lijst'),
+      'p#lijst': gezet('b', 'p#lijst'),
+      'c#lijst': gezet('c', 'c#lijst'),
+      'm#lijst': gezet('d', 'm#lijst'),
     }
-    const van = vergelijkTaken(heel(), opslag, [
-      { id: 'a', title: 'tandarts', status: 'completed' },
-      { id: 'b', title: 'paspoort ophalen', status: 'needsAction' },
+    const van = vergelijkTaken(l, opslag, [
+      { id: 'a', title: 'tandarts', status: 'completed', notes: 'controle\n\nUit Lijstjes: Afspraken' },
+      { id: 'b', title: 'paspoort en rijbewijs ophalen', status: 'needsAction', notes: 'Uit Lijstjes: Afspraken' },
+      { id: 'd', title: '3 melk', status: 'needsAction', notes: 'halfvol\n\nUit Lijstjes: Afspraken' },
       { id: 'n', title: 'brood', status: 'needsAction' },
       { id: 'x', title: 'weg', deleted: true },
     ])
-    expect(van.af).toEqual([{ itemId: 't', af: true }])
+    expect(van.wijzig).toEqual([
+      { itemId: 't', af: true },
+      { itemId: 'p', tekst: 'paspoort en rijbewijs ophalen', aantal: '' },
+      // Cadeau is in Google verwijderd: in Lijstjes afgevinkt.
+      { itemId: 'c', af: true },
+      { itemId: 'm', tekst: 'melk', aantal: '3', notitie: 'halfvol' },
+    ])
     expect(van.nieuw.map((t) => t.title)).toEqual(['brood'])
     expect(van.weg).toEqual(['c#lijst'])
+    // Een in Google verwijderde taak komt er niet opnieuw in, tot je het item weer open zet.
+    const na: GoogleOpslag = { ...opslag, 'c#lijst': { ...opslag['c#lijst'], verwijderd: true } }
+    const afgevinkt = { ...l, items: l.items.map((i) => (i.id === 'c' ? { ...i, af: true } : i)) }
+    expect(plan(doelen([afgevinkt], undefined, na), na).filter((a) => a.itemId === 'c#lijst')).toEqual([])
+    expect(
+      plan(doelen([l], undefined, na), na)
+        .filter((a) => a.itemId === 'c#lijst')
+        .map((a) => a.soort),
+    ).toEqual(['maak'])
   })
 
   it('bij het openen van het lijstje: in Google afgevinkt en nieuw komt in Lijstjes', async () => {
