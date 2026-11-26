@@ -3,7 +3,7 @@
 // telefoon naar Google; er is geen server van Lijstjes.
 
 import { DUUR_MINUTEN, heeftTijdDeel, toDate, volgendeKeer, zichtbaar } from './agenda'
-import { heeftTijd, heeftZonderJaar, naarGoogle, type Lijstje } from './lists'
+import { heeftDatum, heeftTijd, heeftZonderJaar, heelInGoogle, naarGoogle, type Lijstje } from './lists'
 import { KEY_PREFIX } from './storageKey'
 
 /**
@@ -40,13 +40,25 @@ export interface Doel {
   /** Zonder jaar: het agenda-item komt elk jaar terug (F44). */
   jaarlijks: boolean
   af: boolean
+  /** Het hele lijstje in Google Tasks (F52): het id van de eigen takenlijst bij Google. Anders je standaardlijst. */
+  takenlijst?: string
 }
 
 export interface Gezet {
-  soort: Soort
+  /** `takenlijst`: de eigen lijst van een lijstje in Google Tasks (F52), onder de sleutel `lijst:<id van het lijstje>`. */
+  soort: Soort | 'takenlijst'
   id: string
   hash: string
+  /** Een taak in de eigen takenlijst van het lijstje (F52): het id van die takenlijst bij Google. */
+  takenlijst?: string
+  /** Bij een taak in de eigen takenlijst: afgevinkt zoals Lijstjes het daar het laatst zette (F52). */
+  af?: boolean
 }
+
+/** Achter het item-id: de taak in de eigen takenlijst van het lijstje (F52). */
+export const IN_LIJST = '#lijst'
+/** Voor het id van een lijstje: de eigen takenlijst van dat lijstje in Google Tasks (F52). */
+export const LIJST_PREFIX = 'lijst:'
 
 export type GoogleOpslag = Record<string, Gezet>
 
@@ -63,19 +75,47 @@ export function soortVan(moment: string, jaarlijks = false): Soort {
   return jaarlijks || heeftTijdDeel(moment) ? 'agenda' : 'tasks'
 }
 
-/** Hoe alle items die naar Google horen er daar uit moeten zien, per item-id (F48). */
-export function doelen(lijstjes: readonly Lijstje[], now: Date = new Date()): Map<string, Doel> {
+/**
+ * Hoe alle items die naar Google horen er daar uit moeten zien, per item-id (F48). Met het hele lijstje in Google
+ * Tasks (F52) staat elk item als taak in de eigen takenlijst (sleutel `<item-id>#lijst`, zodra die takenlijst er is);
+ * een item met een tijd komt daarnaast in Google Agenda, een item met alleen een datum niet nog eens in je
+ * standaardlijst.
+ */
+export function doelen(
+  lijstjes: readonly Lijstje[],
+  now: Date = new Date(),
+  opslag: GoogleOpslag = {},
+): Map<string, Doel> {
   const result = new Map<string, Doel>()
   for (const l of lijstjes) {
     const tijd = heeftTijd(l)
     const jaarlijks = heeftZonderJaar(l)
+    const heel = heelInGoogle(l)
+    const takenlijst = heel ? opslag[LIJST_PREFIX + l.id]?.id : undefined
     for (const item of l.items) {
+      const titel = item.aantal && l.kenmerken?.aantal ? `${item.aantal} ${item.tekst}` : item.tekst
+      const notitie = l.kenmerken?.notitie ? item.notitie : undefined
+      if (takenlijst) {
+        const dag = heeftDatum(l) && item.wanneer ? item.wanneer.slice(0, 10) : ''
+        result.set(item.id + IN_LIJST, {
+          soort: 'tasks',
+          titel,
+          ...(notitie && { notitie }),
+          lijstje: l.naam,
+          moment: jaarlijks && dag ? volgendeKeer(dag, now) : dag,
+          jaarlijks: false,
+          af: item.af,
+          takenlijst,
+        })
+      }
       if (!naarGoogle(l, item) || !item.wanneer) continue
       const zien = zichtbaar(item.wanneer, tijd)
-      const notitie = l.kenmerken?.notitie ? item.notitie : undefined
+      const soort = soortVan(zien, jaarlijks)
+      // Het hele lijstje in Google Tasks: een item met alleen een datum staat al in de eigen takenlijst.
+      if (heel && soort === 'tasks') continue
       result.set(item.id, {
-        soort: soortVan(zien, jaarlijks),
-        titel: item.aantal && l.kenmerken?.aantal ? `${item.aantal} ${item.tekst}` : item.tekst,
+        soort,
+        titel,
         ...(notitie && { notitie }),
         lijstje: l.naam,
         moment: jaarlijks ? volgendeKeer(zien, now) : zien,
@@ -87,17 +127,30 @@ export function doelen(lijstjes: readonly Lijstje[], now: Date = new Date()): Ma
   return result
 }
 
+/** De takenlijsten die er moeten zijn (F52): per sleutel `lijst:<id>` de naam van het lijstje. */
+export function gewensteLijsten(lijstjes: readonly Lijstje[]): Map<string, string> {
+  return new Map(lijstjes.filter(heelInGoogle).map((l) => [LIJST_PREFIX + l.id, l.naam]))
+}
+
+/** Moet er bij Google iets gebeuren: een takenlijst maken, hernoemen of weghalen, of een item bijwerken? */
+export function werkNodig(lijstjes: readonly Lijstje[], opslag: GoogleOpslag, now: Date = new Date()): boolean {
+  const lijsten = gewensteLijsten(lijstjes)
+  for (const [key, gezet] of Object.entries(opslag)) {
+    if (key.startsWith(LIJST_PREFIX) && lijsten.get(key) !== gezet.hash) return true
+  }
+  for (const key of lijsten.keys()) if (!Object.hasOwn(opslag, key)) return true
+  return plan(doelen(lijstjes, now, opslag), opslag).length > 0
+}
+
+/** Zonder de takenlijst `key` en de taken daarin (die gaan met de takenlijst mee). */
+export function zonderTakenlijst(opslag: GoogleOpslag, key: string): GoogleOpslag {
+  const lijst = opslag[key]?.id
+  return Object.fromEntries(Object.entries(opslag).filter(([k, g]) => k !== key && (!lijst || g.takenlijst !== lijst)))
+}
+
 /** Wat er bij Google moet kloppen; een afgevinkt agenda-item krijgt een vinkje zonder melding, een taak wordt afgevinkt. */
 export function hashDoel(d: Doel): string {
-  return JSON.stringify([
-    d.soort,
-    d.titel,
-    d.notitie ?? '',
-    d.lijstje,
-    d.moment,
-    d.jaarlijks,
-    d.af,
-  ])
+  return JSON.stringify([d.soort, d.titel, d.notitie ?? '', d.lijstje, d.moment, d.jaarlijks, d.af])
 }
 
 /**
@@ -108,15 +161,17 @@ export function hashDoel(d: Doel): string {
 export function plan(gewenst: Map<string, Doel>, opslag: GoogleOpslag): Actie[] {
   const acties: Actie[] = []
   for (const [itemId, gezet] of Object.entries(opslag)) {
+    if (itemId.startsWith(LIJST_PREFIX)) continue
     const doel = gewenst.get(itemId)
     if (!doel) acties.push({ soort: 'weg', itemId, gezet })
     else if (doel.soort !== gezet.soort) {
       acties.push({ soort: 'weg', itemId, gezet })
-      if (!doel.af) acties.push({ soort: 'maak', itemId, doel })
+      if (!doel.af || doel.takenlijst) acties.push({ soort: 'maak', itemId, doel })
     } else if (hashDoel(doel) !== gezet.hash) acties.push({ soort: 'wijzig', itemId, doel, gezet })
   }
   for (const [itemId, doel] of gewenst) {
-    if (!Object.hasOwn(opslag, itemId) && !doel.af) acties.push({ soort: 'maak', itemId, doel })
+    // In de eigen takenlijst komen ook afgevinkte items (F52); elders niet meer.
+    if (!Object.hasOwn(opslag, itemId) && (!doel.af || doel.takenlijst)) acties.push({ soort: 'maak', itemId, doel })
   }
   return acties
 }
@@ -178,13 +233,20 @@ export function taakBody(d: Doel) {
   return {
     title: d.titel,
     notes: beschrijving(d),
-    due: `${d.moment.slice(0, 10)}T00:00:00.000Z`,
+    due: d.moment ? `${d.moment.slice(0, 10)}T00:00:00.000Z` : null,
     status: d.af ? 'completed' : 'needsAction',
   }
 }
 
 const AGENDA_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
-const TASKS_URL = 'https://tasks.googleapis.com/tasks/v1/lists/@default/tasks'
+const TASKS_BASIS = 'https://tasks.googleapis.com/tasks/v1'
+/** De eigen takenlijsten (F52). */
+const LIJSTEN_URL = `${TASKS_BASIS}/users/@me/lists`
+
+/** De taken van je standaardlijst, of van een eigen takenlijst (F52). */
+function takenUrl(takenlijst?: string): string {
+  return `${TASKS_BASIS}/lists/${takenlijst ? encodeURIComponent(takenlijst) : '@default'}/tasks`
+}
 
 /** Een antwoord van Google dat niet goed is; 401 betekent dat je opnieuw moet inloggen. */
 export class GoogleFout extends Error {
@@ -211,9 +273,14 @@ async function maak(token: string, doel: Doel): Promise<Gezet> {
   const res =
     doel.soort === 'agenda'
       ? await roep(token, 'POST', AGENDA_URL, agendaBody(doel))
-      : await roep(token, 'POST', TASKS_URL, taakBody(doel))
+      : await roep(token, 'POST', takenUrl(doel.takenlijst), taakBody(doel))
   if (!res?.id) throw new GoogleFout(500)
-  return { soort: doel.soort, id: res.id, hash: hashDoel(doel) }
+  return {
+    soort: doel.soort,
+    id: res.id,
+    hash: hashDoel(doel),
+    ...(doel.takenlijst && { takenlijst: doel.takenlijst, af: doel.af }),
+  }
 }
 
 /**
@@ -222,7 +289,7 @@ async function maak(token: string, doel: Doel): Promise<Gezet> {
  */
 export async function voerUit(token: string, actie: Actie): Promise<Gezet | null | 'verdwenen'> {
   if (actie.soort === 'maak') return maak(token, actie.doel)
-  const url = `${actie.gezet.soort === 'agenda' ? AGENDA_URL : TASKS_URL}/${encodeURIComponent(actie.gezet.id)}`
+  const url = `${actie.gezet.soort === 'agenda' ? AGENDA_URL : takenUrl(actie.gezet.takenlijst)}/${encodeURIComponent(actie.gezet.id)}`
   if (actie.soort === 'weg') {
     try {
       await roep(token, 'DELETE', url)
@@ -234,10 +301,10 @@ export async function voerUit(token: string, actie: Actie): Promise<Gezet | null
   }
   try {
     await roep(token, 'PATCH', url, actie.doel.soort === 'agenda' ? agendaBody(actie.doel) : taakBody(actie.doel))
-    return { ...actie.gezet, hash: hashDoel(actie.doel) }
+    return { ...actie.gezet, hash: hashDoel(actie.doel), ...(actie.gezet.takenlijst && { af: actie.doel.af }) }
   } catch (e) {
-    // Bij Google zelf verwijderd: niet opnieuw maken (F48).
-    if (e instanceof GoogleFout && weg(e.status)) return 'verdwenen'
+    // Bij Google zelf verwijderd: niet opnieuw maken (F48); in de eigen takenlijst wel, want die volgt het lijstje (F52).
+    if (e instanceof GoogleFout && weg(e.status)) return actie.doel.takenlijst ? maak(token, actie.doel) : 'verdwenen'
     throw e
   }
 }
@@ -248,8 +315,18 @@ export function loadOpslag(): GoogleOpslag {
     if (typeof v !== 'object' || v === null || Array.isArray(v)) return {}
     const result: GoogleOpslag = {}
     for (const [id, g] of Object.entries(v as Record<string, Partial<Gezet>>)) {
-      if ((g?.soort === 'agenda' || g?.soort === 'tasks') && typeof g.id === 'string' && typeof g.hash === 'string') {
-        result[id] = { soort: g.soort, id: g.id, hash: g.hash }
+      if (
+        (g?.soort === 'agenda' || g?.soort === 'tasks' || g?.soort === 'takenlijst') &&
+        typeof g.id === 'string' &&
+        typeof g.hash === 'string'
+      ) {
+        result[id] = {
+          soort: g.soort,
+          id: g.id,
+          hash: g.hash,
+          ...(typeof g.takenlijst === 'string' && { takenlijst: g.takenlijst }),
+          ...(typeof g.af === 'boolean' && { af: g.af }),
+        }
       }
     }
     return result
@@ -266,6 +343,47 @@ export function saveOpslag(opslag: GoogleOpslag): void {
   }
 }
 
+/** Maakt, hernoemt en verwijdert de eigen takenlijsten (F52). Verwijderen neemt de taken erin mee. */
+async function lijstenBijwerken(
+  token: string,
+  lijstjes: readonly Lijstje[],
+  opslag: GoogleOpslag,
+  onStap: (opslag: GoogleOpslag) => void,
+): Promise<GoogleOpslag> {
+  let huidig = opslag
+  const lijsten = gewensteLijsten(lijstjes)
+  for (const [key, gezet] of Object.entries(huidig)) {
+    if (!key.startsWith(LIJST_PREFIX) || lijsten.has(key)) continue
+    try {
+      await roep(token, 'DELETE', `${LIJSTEN_URL}/${encodeURIComponent(gezet.id)}`)
+    } catch (e) {
+      if (!(e instanceof GoogleFout && weg(e.status))) throw e
+    }
+    huidig = zonderTakenlijst(huidig, key)
+    onStap(huidig)
+  }
+  for (const [key, naam] of lijsten) {
+    const gezet = huidig[key]
+    if (!gezet) {
+      const res = await roep(token, 'POST', LIJSTEN_URL, { title: naam })
+      if (!res?.id) throw new GoogleFout(500)
+      huidig = { ...huidig, [key]: { soort: 'takenlijst', id: res.id, hash: naam } }
+      onStap(huidig)
+    } else if (gezet.hash !== naam) {
+      try {
+        await roep(token, 'PATCH', `${LIJSTEN_URL}/${encodeURIComponent(gezet.id)}`, { title: naam })
+        huidig = { ...huidig, [key]: { ...gezet, hash: naam } }
+      } catch (e) {
+        if (!(e instanceof GoogleFout && weg(e.status))) throw e
+        // Bij Google verwijderd: de volgende ronde maakt hem opnieuw.
+        huidig = zonderTakenlijst(huidig, key)
+      }
+      onStap(huidig)
+    }
+  }
+  return huidig
+}
+
 /**
  * Brengt Google gelijk met Lijstjes. Een 401 (opnieuw inloggen) of een netwerkfout gaat door naar de aanroeper.
  * `onVerdwenen`: items die bij Google zelf zijn verwijderd; die zet Lijstjes uit in plaats van opnieuw te maken (F48).
@@ -280,19 +398,94 @@ export async function bijwerken(
 ): Promise<GoogleOpslag> {
   let huidig = { ...opslag }
   const verdwenen: string[] = []
-  for (const actie of plan(doelen(lijstjes, now), huidig)) {
-    if (verdwenen.includes(actie.itemId)) continue
-    const gezet = await voerUit(token, actie)
-    huidig = { ...huidig }
-    if (gezet === 'verdwenen') {
-      delete huidig[actie.itemId]
-      verdwenen.push(actie.itemId)
-    } else if (gezet) huidig[actie.itemId] = gezet
-    else if (actie.soort === 'weg' && huidig[actie.itemId]?.id === actie.gezet.id) delete huidig[actie.itemId]
-    onStap(huidig)
+  // Twee rondes: is een eigen takenlijst bij Google verwijderd, dan maakt de tweede ronde hem opnieuw (F52).
+  for (let ronde = 0; ronde < 2; ronde++) {
+    huidig = await lijstenBijwerken(token, lijstjes, huidig, onStap)
+    let nogEens = false
+    for (const actie of plan(doelen(lijstjes, now, huidig), huidig)) {
+      if (verdwenen.includes(actie.itemId)) continue
+      let gezet: Gezet | null | 'verdwenen'
+      try {
+        gezet = await voerUit(token, actie)
+      } catch (e) {
+        const lijst = actie.soort === 'weg' ? actie.gezet.takenlijst : actie.doel.takenlijst
+        const key = lijst && Object.keys(huidig).find((k) => k.startsWith(LIJST_PREFIX) && huidig[k].id === lijst)
+        if (!(key && e instanceof GoogleFout && weg(e.status))) throw e
+        huidig = zonderTakenlijst(huidig, key)
+        onStap(huidig)
+        nogEens = true
+        break
+      }
+      huidig = { ...huidig }
+      if (gezet === 'verdwenen') {
+        delete huidig[actie.itemId]
+        verdwenen.push(actie.itemId)
+      } else if (gezet) huidig[actie.itemId] = gezet
+      else if (actie.soort === 'weg' && huidig[actie.itemId]?.id === actie.gezet.id) delete huidig[actie.itemId]
+      onStap(huidig)
+    }
+    if (!nogEens) break
   }
   if (verdwenen.length > 0) onVerdwenen(verdwenen)
   return huidig
+}
+
+/** Een taak zoals Google Tasks hem teruggeeft (F52). */
+export interface Taak {
+  id: string
+  title?: string
+  status?: string
+  due?: string
+  deleted?: boolean
+}
+
+/** Alle taken van een eigen takenlijst, ook afgevinkte (F52). */
+export async function haalTakenOp(token: string, takenlijst: string): Promise<Taak[]> {
+  const result: Taak[] = []
+  let pagina: string | undefined
+  do {
+    const url = `${takenUrl(takenlijst)}?showCompleted=true&showHidden=true&maxResults=100${pagina ? `&pageToken=${encodeURIComponent(pagina)}` : ''}`
+    const res = (await roep(token, 'GET', url)) as { items?: Taak[]; nextPageToken?: string } | null
+    result.push(...(res?.items ?? []))
+    pagina = res?.nextPageToken
+  } while (pagina)
+  return result
+}
+
+/** Wat er in de eigen takenlijst bij Google anders is dan Lijstjes het daar zette (F52). */
+export interface VanGoogle {
+  /** In Google afgevinkt of weer open gezet. */
+  af: { itemId: string; af: boolean }[]
+  /** In Google nieuw toegevoegd. */
+  nieuw: Taak[]
+  /** In Google verwijderd: Lijstjes zet ze er weer in (het lijstje is leidend). */
+  weg: string[]
+}
+
+export function vergelijkTaken(l: Lijstje, opslag: GoogleOpslag, taken: readonly Taak[]): VanGoogle {
+  const takenlijst = opslag[LIJST_PREFIX + l.id]?.id
+  const result: VanGoogle = { af: [], nieuw: [], weg: [] }
+  if (!takenlijst) return result
+  const perId = new Map(taken.filter((t) => !t.deleted).map((t) => [t.id, t]))
+  const bekend = new Set(
+    Object.values(opslag)
+      .filter((g) => g.takenlijst === takenlijst)
+      .map((g) => g.id),
+  )
+  for (const item of l.items) {
+    const key = item.id + IN_LIJST
+    const gezet = opslag[key]
+    if (!gezet || gezet.takenlijst !== takenlijst) continue
+    const taak = perId.get(gezet.id)
+    if (!taak) {
+      result.weg.push(key)
+      continue
+    }
+    const af = taak.status === 'completed'
+    if (af !== (gezet.af ?? false) && af !== item.af) result.af.push({ itemId: item.id, af })
+  }
+  result.nieuw = taken.filter((t) => !t.deleted && !bekend.has(t.id) && t.title?.trim())
+  return result
 }
 
 /**
@@ -300,7 +493,7 @@ export async function bijwerken(
  * `deleted`) teruggeeft. Andere fouten (401, geen internet) gaan door naar de aanroeper.
  */
 export async function staatNogInGoogle(token: string, gezet: Gezet): Promise<boolean> {
-  const url = `${gezet.soort === 'agenda' ? AGENDA_URL : TASKS_URL}/${encodeURIComponent(gezet.id)}`
+  const url = `${gezet.soort === 'agenda' ? AGENDA_URL : takenUrl(gezet.takenlijst)}/${encodeURIComponent(gezet.id)}`
   try {
     const res = (await roep(token, 'GET', url)) as { status?: string; deleted?: boolean } | null
     return res?.status !== 'cancelled' && res?.deleted !== true

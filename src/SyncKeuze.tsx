@@ -12,11 +12,15 @@ interface Props {
   huidig: AgendaKeuze | undefined
   /** Google, automatisch: komen alle items met een datum in Google (F48)? */
   googleAlle: boolean
+  /** Google, automatisch: staat het hele lijstje als eigen lijst in Google Tasks (F52)? */
+  heel: boolean
+  /** Heeft het lijstje het kenmerk Datum? Anders is er geen schakelaar Items met een datum. */
+  datum: boolean
   ingelogd: boolean
   onInloggen: () => void
   onUitloggen: () => void
   onAnnuleren: () => void
-  onBewaren: (keuze: AgendaKeuze, googleAlle: boolean) => void
+  onBewaren: (keuze: AgendaKeuze, googleAlle: boolean, heel: boolean) => void
 }
 
 function hoofdVan(k: AgendaKeuze | undefined): Hoofd | null {
@@ -29,6 +33,8 @@ export function SyncKeuze({
   naam,
   huidig,
   googleAlle: alleBegin,
+  heel: heelBegin,
+  datum,
   ingelogd,
   onInloggen,
   onUitloggen,
@@ -40,10 +46,11 @@ export function SyncKeuze({
     isAgenda(huidig) || huidig === PER_ITEM ? huidig : PER_ITEM,
   )
   const [alle, setAlle] = useState(alleBegin)
+  const [heel, setHeel] = useState(heelBegin)
 
   function bewaren() {
     if (!hoofd) return
-    onBewaren(hoofd === 'google' ? GOOGLE_AUTO : hoofd === 'alleen' ? GEEN : agenda, alle)
+    onBewaren(hoofd === 'google' ? GOOGLE_AUTO : hoofd === 'alleen' ? GEEN : agenda, alle, heel)
   }
 
   const optie = (id: Hoofd, Icoon: typeof RefreshCw, titel: string, uitleg: string, sub?: ReactNode) => (
@@ -72,21 +79,39 @@ export function SyncKeuze({
         'Google, automatisch',
         'Lijstjes houdt het in Google bij als je iets wijzigt, afvinkt of weggooit.',
         <div className="sync-sub">
+          {datum && (
+            <>
+              <label className="kenmerk">
+                <span>Items met een datum</span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  className="herinnering-switch"
+                  aria-label="Items met een datum"
+                  checked={alle}
+                  onChange={(e) => setAlle(e.target.checked)}
+                />
+              </label>
+              <p className="google-uitleg">
+                {alle
+                  ? 'Dit lijstje zet items met een tijd in jouw Google Agenda, en items zonder tijd in Google Tasks. Per item kan je dit uitzetten.'
+                  : 'Uit: je kiest in het kaartje van elk item of het in Google komt.'}
+              </p>
+            </>
+          )}
           <label className="kenmerk">
-            <span>Items met een datum</span>
+            <span>Het hele lijstje</span>
             <input
               type="checkbox"
               role="switch"
               className="herinnering-switch"
-              aria-label="Items met een datum"
-              checked={alle}
-              onChange={(e) => setAlle(e.target.checked)}
+              aria-label="Het hele lijstje"
+              checked={heel}
+              onChange={(e) => setHeel(e.target.checked)}
             />
           </label>
           <p className="google-uitleg">
-            {alle
-              ? 'Dit lijstje zet items met een tijd in jouw Google Agenda, en items zonder tijd in Google Tasks. Per item kan je dit uitzetten.'
-              : 'Uit: je kiest in het kaartje van elk item of het in Google komt.'}
+            {`Een eigen lijst "${naam}" in Google Tasks met alle items, ook zonder datum. Afvinken gaat beide kanten op.`}
           </p>
           <p className="google-uitleg">
             {ingelogd ? 'Ingelogd bij Google' : 'Niet ingelogd bij Google'}{' '}

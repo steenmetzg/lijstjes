@@ -28,6 +28,7 @@ import {
   staatInAgenda,
   type Details,
   type Kenmerken,
+  type Item,
   type Lijstje,
 } from './lists'
 import { GOOGLE_AUTO, isAgenda, PER_ITEM, volgendeKeer, zetInAgenda, zichtbaar, type AgendaKeuze } from './agenda'
@@ -71,7 +72,28 @@ export default function App() {
   // Google Agenda en Google Tasks gelijk houden met de lijstjes (F48, F49).
   // Bij het openen van een lijstje: items die je bij Google zelf hebt verwijderd, gaan uit (F48).
   const googleVerdwenen = useCallback((ids: string[]) => setLijstjes((all) => zetGoogleUit(all, ids)), [])
-  const google = useGoogle(lijstjes, screen === 'lijst' ? (lijstje?.id ?? null) : null, googleVerdwenen)
+  // Het hele lijstje in Google Tasks: in Google afgevinkt of nieuw toegevoegd komt terug in Lijstjes (F52).
+  const googleVanLijst = useCallback(
+    (lijstjeId: string, af: { itemId: string; af: boolean }[], nieuw: Item[]) =>
+      setLijstjes((all) =>
+        all.map((l) =>
+          l.id !== lijstjeId
+            ? l
+            : {
+                ...l,
+                items: [
+                  ...l.items.map((i) => {
+                    const w = af.find((x) => x.itemId === i.id)
+                    return w ? { ...i, af: w.af } : i
+                  }),
+                  ...nieuw,
+                ],
+              },
+        ),
+      ),
+    [],
+  )
+  const google = useGoogle(lijstjes, screen === 'lijst' ? (lijstje?.id ?? null) : null, googleVerdwenen, googleVanLijst)
   const [googleMeldingWeg, setGoogleMeldingWeg] = useState(false)
   useEffect(() => {
     if (!google.inloggenNodig) setGoogleMeldingWeg(false)
@@ -468,6 +490,12 @@ export default function App() {
       onAddDetails={addWithDetails}
       onFout={(text, veld) => setNotice({ kind: 'error', text, ...(veld && { veld }) })}
       onAgenda={agenda}
+      onGoogleLijst={(heel) =>
+        update(lijstje.id, (x) => {
+          const { googleLijst: _heel, ...rest } = x
+          return heel ? { ...rest, googleLijst: true as const } : rest
+        })
+      }
       onGoogleAlle={(alle) =>
         update(lijstje.id, (x) => {
           const { googleAlle: _alle, ...rest } = x

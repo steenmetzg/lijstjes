@@ -54,6 +54,13 @@ export interface Lijstje {
   agenda?: AgendaKeuze
   /** Met Google, automatisch: `false` als de schakelaar Alle items met een datum uit staat (F48). */
   googleAlle?: false
+  /** Met Google, automatisch: het hele lijstje staat als eigen lijst in Google Tasks (F52). */
+  googleLijst?: true
+}
+
+/** Staat het hele lijstje als eigen lijst in Google Tasks (F52)? */
+export function heelInGoogle(l: Lijstje): boolean {
+  return l.agenda === GOOGLE_AUTO && l.googleLijst === true
 }
 
 /** Komt dit item in Google Agenda of Google Tasks (F48)? Alleen met een datum. */
@@ -130,7 +137,7 @@ export const HERINNERINGEN_KEY = `${KEY_PREFIX}herinneringen`
 export const KENMERKEN_KEY = `${KEY_PREFIX}kenmerken`
 
 export interface KenmerkenOpslag {
-  lijstjes: Record<string, { kenmerken: Kenmerken; agenda?: AgendaKeuze; googleAlle?: false }>
+  lijstjes: Record<string, { kenmerken: Kenmerken; agenda?: AgendaKeuze; googleAlle?: false; googleLijst?: true }>
   items: Record<string, { wanneer?: string; inAgenda?: string; notitie?: string; aantal?: string; google?: boolean }>
 }
 
@@ -352,6 +359,7 @@ export function splitKenmerken(lijstjes: readonly Lijstje[]): KenmerkenOpslag {
       kenmerken,
       ...(l.agenda && { agenda: l.agenda }),
       ...(l.googleAlle === false && { googleAlle: false as const }),
+      ...(l.googleLijst === true && { googleLijst: true as const }),
     }
     for (const i of l.items) {
       const extra = {
@@ -423,6 +431,7 @@ export function mergeHerinneringen(lijstjes: Lijstje[], herinneringen: unknown, 
       ...(kenmerken && { kenmerken }),
       ...(isAgendaKeuze(agenda) && { agenda }),
       ...(nieuw?.googleAlle === false && { googleAlle: false as const }),
+      ...(nieuw?.googleLijst === true && { googleLijst: true as const }),
     }
   })
 }

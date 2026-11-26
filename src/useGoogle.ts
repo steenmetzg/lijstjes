@@ -7,21 +7,24 @@ import { GOOGLE_AUTO } from './agenda'
 import {
   bijwerken,
   controleer,
-  doelen,
+  haalTakenOp,
+  LIJST_PREFIX,
+  IN_LIJST,
+  vergelijkTaken,
+  werkNodig,
   googleClientId,
   GoogleFout,
   isIngelogd,
   laadGoogle,
   loadOpslag,
   loadToken,
-  plan,
   saveOpslag,
   uitloggen as googleUitloggen,
   vergeetToken,
   vraagToegang,
   type GoogleOpslag,
 } from './google'
-import type { Lijstje } from './lists'
+import { heeftDatum, MAX_TEKST, newId, type Item, type Lijstje } from './lists'
 
 /** Zo lang na een wijziging wacht de app, zodat snel achter elkaar wijzigen één keer bijwerken is. */
 const WACHT_MS = 1500
@@ -50,6 +53,7 @@ export function useGoogle(
   lijstjes: readonly Lijstje[],
   open: string | null = null,
   onVerdwenen: (itemIds: string[]) => void = () => {},
+  onVanGoogle: (lijstjeId: string, af: { itemId: string; af: boolean }[], nieuw: Item[]) => void = () => {},
 ): GoogleStaat {
   const [opslag, setOpslag] = useState<GoogleOpslag>(loadOpslag)
   const [ingelogd, setIngelogd] = useState(isIngelogd)
@@ -57,10 +61,10 @@ export function useGoogle(
   const [ronde, setRonde] = useState(0)
   const bezig = useRef(false)
   const opnieuw = useRef(false)
-  const actueel = useRef({ lijstjes, opslag, onVerdwenen })
+  const actueel = useRef({ lijstjes, opslag, onVerdwenen, onVanGoogle })
   useEffect(() => {
-    actueel.current = { lijstjes, opslag, onVerdwenen }
-  }, [lijstjes, opslag, onVerdwenen])
+    actueel.current = { lijstjes, opslag, onVerdwenen, onVanGoogle }
+  }, [lijstjes, opslag, onVerdwenen, onVanGoogle])
   // Het lijstje waarvan nog moet worden gekeken of de items nog bij Google staan.
   const nakijken = useRef<string | null>(null)
   const vorigOpen = useRef<string | null>(null)
@@ -79,9 +83,12 @@ export function useGoogle(
     const { lijstjes: l, opslag: o } = actueel.current
     const lijstId = nakijken.current
     nakijken.current = null
-    const items = new Set(l.find((x) => x.id === lijstId)?.items.map((i) => i.id) ?? [])
+    const lijstje = l.find((x) => x.id === lijstId)
+    const items = new Set(lijstje?.items.map((i) => i.id) ?? [])
     const teControleren = Object.fromEntries(Object.entries(o).filter(([id]) => items.has(id)))
-    if (plan(doelen(l), o).length === 0 && Object.keys(teControleren).length === 0) {
+    // Het hele lijstje in Google Tasks: de eigen takenlijst ophalen (F52).
+    const takenlijst = lijstje ? o[LIJST_PREFIX + lijstje.id]?.id : undefined
+    if (!werkNodig(l, o) && Object.keys(teControleren).length === 0 && !takenlijst) {
       setInloggenNodig(false)
       return
     }
@@ -97,6 +104,29 @@ export function useGoogle(
       setOpslag(nieuw)
     }
     try {
+      if (lijstje && takenlijst) {
+        const van = vergelijkTaken(lijstje, actueel.current.opslag, await haalTakenOp(token, takenlijst))
+        const nieuw = { ...actueel.current.opslag }
+        // In Google verwijderd: opnieuw maken.
+        for (const key of van.weg) delete nieuw[key]
+        for (const { itemId, af } of van.af) nieuw[itemId + IN_LIJST] = { ...nieuw[itemId + IN_LIJST], af }
+        const nieuweItems: Item[] = van.nieuw.map((t) => {
+          const item: Item = {
+            id: newId(),
+            tekst: (t.title ?? '').trim().slice(0, MAX_TEKST),
+            af: t.status === 'completed',
+            ...(heeftDatum(lijstje) && t.due && { wanneer: t.due.slice(0, 10) }),
+          }
+          nieuw[item.id + IN_LIJST] = { soort: 'tasks', id: t.id, hash: '', takenlijst, af: item.af }
+          return item
+        })
+        if (van.weg.length + van.af.length + nieuweItems.length > 0) bewaar(nieuw)
+        if (van.af.length + nieuweItems.length > 0) {
+          // Eerst Lijstjes bijwerken; de volgende ronde werkt Google bij met de nieuwe lijstjes.
+          actueel.current.onVanGoogle(lijstje.id, van.af, nieuweItems)
+          return
+        }
+      }
       const verdwenen = await controleer(token, teControleren)
       if (verdwenen.length > 0) {
         const nieuw = { ...actueel.current.opslag }
@@ -136,7 +166,10 @@ export function useGoogle(
 
   useEffect(() => {
     const nogEens = () => {
-      if (document.visibilityState === 'visible') setRonde((r) => r + 1)
+      if (document.visibilityState !== 'visible') return
+      // Terug in de app met een lijstje open: dat lijstje ook nakijken (F52).
+      if (vorigOpen.current) nakijken.current = vorigOpen.current
+      setRonde((r) => r + 1)
     }
     document.addEventListener('visibilitychange', nogEens)
     window.addEventListener('online', nogEens)
