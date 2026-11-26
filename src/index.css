@@ -1843,3 +1843,75 @@ html.vak-open body {
 .sync-keuze > .confirm-buttons {
   margin-top: 12px;
 }
+
+/* De schakelaars onder Google, automatisch: links, met de naam en de uitleg ernaast (F51). */
+.sync-keuze .sync-schakelaar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.sync-keuze .sync-schakelaar:first-child {
+  margin-top: 0;
+}
+
+.sync-keuze .sync-schakelaar input {
+  flex: none;
+  margin-top: 1px;
+}
+
+.sync-keuze .sync-schakelaar-naam {
+  display: block;
+  font-weight: 500;
+}
+
+.sync-keuze .sync-inlog {
+  margin-top: 12px !important;
+}
+
+/* Kleiner, in verhouding met de rondjes en de tekst ernaast. */
+.sync-keuze .sync-schakelaar .herinnering-switch {
+  width: 28px;
+  height: 16px;
+  margin-top: 3px;
+  border-radius: 8px;
+}
+
+.sync-keuze .sync-schakelaar .herinnering-switch::after {
+  width: 12px;
+  height: 12px;
+}
+
+.sync-keuze .sync-schakelaar .herinnering-switch:checked::after {
+  transform: translateX(12px);
+}
+
+.sync-keuze .sync-schakelaar {
+  gap: 10px;
+}
+
+/* Schakelaar en tekst gecentreerd naast elkaar. */
+.sync-keuze .sync-schakelaar {
+  align-items: center;
+}
+
+.sync-keuze .sync-schakelaar .herinnering-switch {
+  margin-top: 0;
+}
+
+/* De schakelaar staat midden naast de naam; de uitleg springt in tot onder de naam. */
+.sync-keuze .sync-schakelaar {
+  display: block;
+}
+
+.sync-keuze .sync-schakelaar-kop {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.sync-keuze .sync-schakelaar > .sync-uitleg {
+  padding-left: 38px;
+}
