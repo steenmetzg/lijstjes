@@ -276,7 +276,7 @@ describe('AC27: in de agenda zetten', () => {
     expect(url.hostname).toBe('calendar.google.com')
     expect(url.searchParams.get('text')).toBe('Tandarts')
     expect(url.searchParams.get('dates')).toBe('20261112T093000/20261112T100000')
-    // Het item staat nu in de agenda: een vinkje-agenda achter de datum.
+    // Het item staat nu in de agenda: een vinkje-agenda vóór de datum.
     expect(await screen.findByLabelText('staat in je agenda')).toBeInTheDocument()
 
     // Nog eens: het vak zegt dat het er al in staat, en met dezelfde datum kan het er niet nog eens in.

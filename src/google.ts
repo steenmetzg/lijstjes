@@ -121,7 +121,7 @@ export function plan(gewenst: Map<string, Doel>, opslag: GoogleOpslag): Actie[] 
   return acties
 }
 
-/** Staat dit item zoals het nu is in Google? Dan staat er een icoontje achter de datum (F48). */
+/** Staat dit item zoals het nu is in Google? Dan staat er een icoontje vóór de datum (F48). */
 export function staatInGoogle(opslag: GoogleOpslag, itemId: string, doel: Doel | undefined): Soort | null {
   const gezet = opslag[itemId]
   return gezet && doel && gezet.soort === doel.soort && gezet.hash === hashDoel(doel) ? gezet.soort : null

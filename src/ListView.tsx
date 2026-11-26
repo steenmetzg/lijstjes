@@ -321,7 +321,7 @@ function ItemRow({
             </span>
             {wanneer && (
               <span className={isVoorbij(wanneer, undefined, jaarlijks) ? 'item-when past' : 'item-when'}>
-                {/* Vóór de datum: staat het item in Google Agenda of Google Tasks (F48)? */}
+                {/* Vóór de datum: staat het item in Google Agenda, Google Tasks of je agenda (F34, F48)? */}
                 {inGoogle === 'agenda' && (
                   <CalendarCheck
                     className="item-in-agenda"
@@ -333,10 +333,10 @@ function ItemRow({
                 {inGoogle === 'tasks' && (
                   <ListChecks className="item-in-agenda" size={14} strokeWidth={2} aria-label="staat in Google Tasks" />
                 )}
-                {formatWanneer(wanneer, undefined, jaarlijks)}
                 {inAgenda && !inGoogle && (
                   <CalendarCheck className="item-in-agenda" size={14} strokeWidth={2} aria-label="staat in je agenda" />
                 )}
+                {formatWanneer(wanneer, undefined, jaarlijks)}
               </span>
             )}
             {notitie && <span className="item-note">{notitie}</span>}

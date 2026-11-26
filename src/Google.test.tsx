@@ -254,7 +254,7 @@ describe('AC53: Google, automatisch kiezen en inloggen', () => {
     expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.agenda).toBe('google')
   })
 
-  it('ingelogd: schakelaar per lijstje en per item, icoontjes achter de datum', async () => {
+  it('ingelogd: schakelaar per lijstje en per item, icoontjes vóór de datum', async () => {
     vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-id')
     localStorage.setItem(INGELOGD_KEY, '1')
     localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: 'tok', tot: Date.now() + 3600000 }))
