@@ -1,10 +1,39 @@
 // Het scherm "… synchroniseren of delen" (F34, F48, F50): drie hoofdkeuzes, met de agenda's onder Zelf per item.
 
-import { useState, type ReactNode } from 'react'
-import { CalendarPlus, RefreshCw, Smartphone } from 'lucide-react'
+import { useState, type ComponentType, type ReactNode } from 'react'
+import { CalendarPlus, RefreshCw } from 'lucide-react'
 import { AGENDAS, GEEN, GOOGLE_AUTO, isAgenda, PER_ITEM, type Agenda, type AgendaKeuze } from './agenda'
 
 type Hoofd = 'google' | 'zelf' | 'alleen'
+
+/** Het icoon van Lijstjes, open: een afgeronde rand met het lijstje met vinkjes erin, in lijnen (F51). */
+function LijstjesIcoon({
+  size = 18,
+  strokeWidth = 2,
+}: {
+  size?: number
+  strokeWidth?: number
+  'aria-hidden'?: boolean
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="2" y="2" width="20" height="20" rx="4" />
+      <g transform="translate(5.6 5.6) scale(0.53)" strokeWidth={strokeWidth / 0.53}>
+        <path d="M13 5h8M13 12h8M13 19h8m-18-2 2 2 4-4M3 7l2 2 4-4" />
+      </g>
+    </svg>
+  )
+}
 
 interface Props {
   naam: string
@@ -53,17 +82,39 @@ export function SyncKeuze({
     onBewaren(hoofd === 'google' ? GOOGLE_AUTO : hoofd === 'alleen' ? GEEN : agenda, alle, heel)
   }
 
-  const optie = (id: Hoofd, Icoon: typeof RefreshCw, titel: string, uitleg: string, sub?: ReactNode) => (
+  // Een schakelaar links, met de naam en de uitleg ernaast (F51).
+  const schakelaar = (titel: string, aan: boolean, zet: (aan: boolean) => void, uitleg: string) => (
+    <label className="sync-schakelaar">
+      <span className="sync-schakelaar-kop">
+        <input
+          type="checkbox"
+          role="switch"
+          className="herinnering-switch"
+          aria-label={titel}
+          checked={aan}
+          onChange={(e) => zet(e.target.checked)}
+        />
+        <span className="sync-schakelaar-naam">{titel}</span>
+      </span>
+      <span className="sync-uitleg">{uitleg}</span>
+    </label>
+  )
+
+  const optie = (
+    id: Hoofd,
+    Icoon: ComponentType<{ size?: number; strokeWidth?: number; 'aria-hidden'?: boolean }>,
+    titel: string,
+    uitleg: string,
+    sub?: ReactNode,
+  ) => (
     <div className={hoofd === id ? 'sync-optie gekozen' : 'sync-optie'}>
       <label className="sync-kop">
-        <input type="radio" name="sync" checked={hoofd === id} onChange={() => setHoofd(id)} aria-label={titel} />
-        <span>
-          <span className="sync-titel">
-            <Icoon size={18} strokeWidth={2} aria-hidden />
-            {titel}
-          </span>
-          <span className="sync-uitleg">{uitleg}</span>
+        <span className="sync-titel">
+          <input type="radio" name="sync" checked={hoofd === id} onChange={() => setHoofd(id)} aria-label={titel} />
+          <Icoon size={18} strokeWidth={2} aria-hidden />
+          {titel}
         </span>
+        <span className="sync-uitleg">{uitleg}</span>
       </label>
       {hoofd === id && sub}
     </div>
@@ -79,41 +130,22 @@ export function SyncKeuze({
         'Google, automatisch',
         'Lijstjes houdt het in Google bij als je iets wijzigt, afvinkt of weggooit.',
         <div className="sync-sub">
-          {datum && (
-            <>
-              <label className="kenmerk">
-                <span>Items met een datum</span>
-                <input
-                  type="checkbox"
-                  role="switch"
-                  className="herinnering-switch"
-                  aria-label="Items met een datum"
-                  checked={alle}
-                  onChange={(e) => setAlle(e.target.checked)}
-                />
-              </label>
-              <p className="google-uitleg">
-                {alle
-                  ? 'Dit lijstje zet items met een tijd in jouw Google Agenda, en items zonder tijd in Google Tasks. Per item kan je dit uitzetten.'
-                  : 'Uit: je kiest in het kaartje van elk item of het in Google komt.'}
-              </p>
-            </>
+          {datum &&
+            schakelaar(
+              'Items met een datum',
+              alle,
+              setAlle,
+              alle
+                ? 'Dit lijstje zet items met een tijd in jouw Google Agenda, en items zonder tijd in Google Tasks. Per item kan je dit uitzetten.'
+                : 'Uit: je kiest in het kaartje van elk item of het in Google komt.',
+            )}
+          {schakelaar(
+            'Het hele lijstje',
+            heel,
+            setHeel,
+            `Een eigen lijst "${naam}" in Google Tasks met alle items, ook zonder datum. Afvinken gaat beide kanten op.`,
           )}
-          <label className="kenmerk">
-            <span>Het hele lijstje</span>
-            <input
-              type="checkbox"
-              role="switch"
-              className="herinnering-switch"
-              aria-label="Het hele lijstje"
-              checked={heel}
-              onChange={(e) => setHeel(e.target.checked)}
-            />
-          </label>
-          <p className="google-uitleg">
-            {`Een eigen lijst "${naam}" in Google Tasks met alle items, ook zonder datum. Afvinken gaat beide kanten op.`}
-          </p>
-          <p className="google-uitleg">
+          <p className="google-uitleg sync-inlog">
             {ingelogd ? 'Ingelogd bij Google' : 'Niet ingelogd bij Google'}{' '}
             <button type="button" className="link-button" onClick={ingelogd ? onUitloggen : onInloggen}>
               {ingelogd ? 'Uitloggen' : 'Inloggen'}
@@ -143,7 +175,7 @@ export function SyncKeuze({
           </div>
         </div>,
       )}
-      {optie('alleen', Smartphone, 'Alleen in Lijstjes', 'Niets in een agenda of andere app.')}
+      {optie('alleen', LijstjesIcoon, 'Alleen in Lijstjes', 'Niets in een agenda of andere app.')}
       <div className="confirm-buttons">
         <button type="button" className="cancel-half" onClick={onAnnuleren}>
           Annuleren
