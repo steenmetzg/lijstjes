@@ -1,6 +1,6 @@
 // De lijstjes en hun items: de gegevens, bewaren en ophalen, en de regels voor toevoegen (F3 t/m F5).
 
-import { isAgendaKeuze, isMoment, isVoorbij, isWanneer, momentGelijk, zichtbaar, type AgendaKeuze } from './agenda'
+import { GOOGLE_AUTO, isAgendaKeuze, isMoment, isVoorbij, isWanneer, momentGelijk, zichtbaar, type AgendaKeuze } from './agenda'
 import { KEY_PREFIX } from './storageKey'
 
 export interface Item {
@@ -19,6 +19,11 @@ export interface Item {
   notitie?: string
   /** Kenmerk Aantal: vrije tekst, bijv. "2" of "500 g" (F42). */
   aantal?: string
+  /**
+   * Met Google, automatisch (F48): `true` of `false` als je bij dit item zelf koos of het in Google komt; zonder
+   * keuze geldt de schakelaar Alle items met een datum van het lijstje.
+   */
+  google?: boolean
 }
 
 /** De extra kenmerken die een lijstje per item kan hebben (F41). Tijd werkt alleen samen met Datum. */
@@ -47,6 +52,14 @@ export interface Lijstje {
   kenmerken?: Kenmerken
   /** De agenda van dit lijstje, gekozen bij de eerste keer in de agenda zetten (F34). */
   agenda?: AgendaKeuze
+  /** Met Google, automatisch: `false` als de schakelaar Alle items met een datum uit staat (F48). */
+  googleAlle?: false
+}
+
+/** Komt dit item in Google Agenda of Google Tasks (F48)? Alleen met een datum. */
+export function naarGoogle(l: Lijstje, item: Item): boolean {
+  if (l.agenda !== GOOGLE_AUTO || !heeftDatum(l) || !item.wanneer) return false
+  return item.google ?? l.googleAlle !== false
 }
 
 /** Staat Datum aan? Tijd telt alleen samen met Datum (F41). */
@@ -84,8 +97,8 @@ export const HERINNERINGEN_KEY = `${KEY_PREFIX}herinneringen`
 export const KENMERKEN_KEY = `${KEY_PREFIX}kenmerken`
 
 export interface KenmerkenOpslag {
-  lijstjes: Record<string, { kenmerken: Kenmerken; agenda?: AgendaKeuze }>
-  items: Record<string, { wanneer?: string; inAgenda?: string; notitie?: string; aantal?: string }>
+  lijstjes: Record<string, { kenmerken: Kenmerken; agenda?: AgendaKeuze; googleAlle?: false }>
+  items: Record<string, { wanneer?: string; inAgenda?: string; notitie?: string; aantal?: string; google?: boolean }>
 }
 
 export interface Herinneringen {
@@ -302,13 +315,18 @@ export function splitKenmerken(lijstjes: readonly Lijstje[]): KenmerkenOpslag {
     // Elk lijstje staat erin, ook zonder kenmerken: zo weet een volgende keer laden dat het niet uit een oudere versie komt.
     const k = l.kenmerken ?? {}
     const kenmerken: Kenmerken = Object.fromEntries(KENMERKEN.filter((x) => k[x.id]).map((x) => [x.id, true]))
-    result.lijstjes[l.id] = { kenmerken, ...(l.agenda && { agenda: l.agenda }) }
+    result.lijstjes[l.id] = {
+      kenmerken,
+      ...(l.agenda && { agenda: l.agenda }),
+      ...(l.googleAlle === false && { googleAlle: false as const }),
+    }
     for (const i of l.items) {
       const extra = {
         ...(i.wanneer && { wanneer: i.wanneer }),
         ...(i.inAgenda && { inAgenda: i.inAgenda }),
         ...(i.notitie && { notitie: i.notitie }),
         ...(i.aantal && { aantal: i.aantal }),
+        ...(typeof i.google === 'boolean' && { google: i.google }),
       }
       if (Object.keys(extra).length > 0) result.items[i.id] = extra
     }
@@ -363,9 +381,16 @@ export function mergeHerinneringen(lijstjes: Lijstje[], herinneringen: unknown, 
         ...(inAgenda && { inAgenda }),
         ...(notitie && { notitie }),
         ...(aantal && { aantal }),
+        ...(typeof n.google === 'boolean' && { google: n.google }),
       }
     })
-    return { ...l, items, ...(kenmerken && { kenmerken }), ...(isAgendaKeuze(agenda) && { agenda }) }
+    return {
+      ...l,
+      items,
+      ...(kenmerken && { kenmerken }),
+      ...(isAgendaKeuze(agenda) && { agenda }),
+      ...(nieuw?.googleAlle === false && { googleAlle: false as const }),
+    }
   })
 }
 
@@ -404,6 +429,8 @@ export interface Details {
   wanneer?: string
   notitie?: string
   aantal?: string
+  /** De schakelaar In Google Agenda / In Google Tasks in het kaartje (F48); `undefined` laat het zoals het was. */
+  google?: boolean
 }
 
 /**
@@ -434,6 +461,11 @@ export function setDetails(lijstje: Lijstje, id: string, details: Details): Lijs
         const a = details.aantal?.trim().slice(0, MAX_AANTAL)
         if (a) next.aantal = a
         else delete next.aantal
+      }
+      // Alleen bewaren als het afwijkt van de schakelaar van het lijstje; anders volgt het item die (F48).
+      if (details.google !== undefined) {
+        if (details.google === (lijstje.googleAlle !== false)) delete next.google
+        else next.google = details.google
       }
       return next
     }),

@@ -1702,3 +1702,50 @@ html.vak-open body {
   border-color: var(--accent);
   border-style: solid;
 }
+
+/* ---- Google, automatisch en Geen agenda (F48 t/m F50) ---- */
+
+/* Een knop over de hele breedte in de agenda-keuze, met een kopje erboven. */
+.clear-choice .confirm-buttons .wide,
+.clear-choice .confirm-buttons .keuze-kop {
+  grid-column: 1 / -1;
+}
+
+.agenda-choice .confirm-buttons .keuze-kop {
+  margin: 4px 0 0;
+}
+
+.google-uitleg {
+  margin: 2px 0 0 !important;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+/* De schakelaar In Google Agenda / In Google Tasks in het kaartje van een item (F48). */
+.google-kenmerk .kenmerk {
+  justify-content: flex-start;
+  gap: 8px;
+  border-bottom: none;
+  color: var(--text);
+}
+
+.google-kenmerk .kenmerk svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.google-kenmerk .kenmerk span {
+  flex: 1;
+}
+
+.google-kenmerk .kenmerk.off svg {
+  color: var(--muted);
+}
+
+.new-version .link-button {
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+}

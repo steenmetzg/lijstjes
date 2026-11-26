@@ -609,7 +609,16 @@ describe('AC34: per item kiezen', () => {
       within(choice)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Google Agenda', 'Outlook (privé)', 'Outlook (werk)', 'Andere agenda', 'Delen…', 'Per item kiezen'])
+    ).toEqual([
+      'Google, automatisch',
+      'Google Agenda',
+      'Outlook (privé)',
+      'Outlook (werk)',
+      'Andere agenda',
+      'Delen…',
+      'Per item kiezen',
+      'Geen agenda',
+    ])
     await user.click(within(choice).getByRole('button', { name: 'Per item kiezen' }))
     expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.agenda).toBe('per-item')
     for (const [tekst, agenda, host] of [

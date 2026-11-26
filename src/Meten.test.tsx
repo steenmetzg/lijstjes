@@ -147,7 +147,7 @@ describe('AC36 (F40): de informatiepagina vertelt het, uitzetten kan niet', () =
     await user.click(screen.getByRole('button', { name: 'Informatie' }))
     expect(
       screen.getByText(
-        'Lijstjes telt anoniem hoe vaak de app wordt geïnstalleerd en geopend; wat je op je lijstjes zet, wordt nooit verstuurd.',
+        'Lijstjes telt anoniem hoe vaak de app wordt geïnstalleerd en geopend; wat je op je lijstjes zet, wordt nooit verstuurd, behalve naar Google als je bij een lijstje Google, automatisch kiest.',
       ),
     ).toBeInTheDocument()
   })

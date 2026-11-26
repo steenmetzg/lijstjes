@@ -17,15 +17,27 @@ export function isAgenda(value: unknown): value is Agenda {
 }
 
 /**
- * De keuze van een herinneringslijstje: een vaste agenda, of per item kiezen (F34). Zonder keuze is er nog niets
- * gekozen; de eerste keer in de agenda zetten vraagt dan welke agenda.
+ * De keuze van een lijstje met Datum: een vaste agenda, per item kiezen (F34), Google automatisch (F48) of geen
+ * agenda (F50). Zonder keuze is er nog niets gekozen; de eerste keer in de agenda zetten vraagt dan welke agenda.
  */
-export type AgendaKeuze = Agenda | 'per-item'
+export type AgendaKeuze = Agenda | 'per-item' | 'google-auto' | 'geen'
 
 export const PER_ITEM = 'per-item' as const
+/** Lijstjes zet de items zelf in Google Agenda (met tijd) of Google Tasks (zonder tijd) en houdt ze bij (F48). */
+export const GOOGLE_AUTO = 'google-auto' as const
+/** De datums staan alleen in Lijstjes; er is geen knop In agenda zetten (F50). */
+export const GEEN = 'geen' as const
 
 export function isAgendaKeuze(value: unknown): value is AgendaKeuze {
-  return value === PER_ITEM || isAgenda(value)
+  return value === PER_ITEM || value === GOOGLE_AUTO || value === GEEN || isAgenda(value)
+}
+
+/** Hoe de keuze heet op de regel "Agenda: …" in het vak met de schuifjes (F41). */
+export function keuzeLabel(keuze: AgendaKeuze): string {
+  if (keuze === PER_ITEM) return 'per item kiezen'
+  if (keuze === GOOGLE_AUTO) return 'Google, automatisch'
+  if (keuze === GEEN) return 'geen'
+  return agendaLabel(keuze)
 }
 
 export function agendaLabel(agenda: Agenda): string {
