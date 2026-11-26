@@ -12,6 +12,8 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  '1.9.2':
+    'Op een lijstje met datums kun je items zonder datum nu verslepen. Ze blijven onder de items met een datum.',
   // Alleen Synchroniseren of delen scrolt nu, zodat Bewaren altijd te bereiken is: geen eigen tekst.
   '1.9.1': '',
   '1.9.0':
