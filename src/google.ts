@@ -87,7 +87,7 @@ export function doelen(lijstjes: readonly Lijstje[], now: Date = new Date()): Ma
   return result
 }
 
-/** Wat er bij Google moet kloppen; een afgevinkt agenda-item blijft gewoon staan, een taak wordt afgevinkt. */
+/** Wat er bij Google moet kloppen; een afgevinkt agenda-item krijgt een vinkje zonder melding, een taak wordt afgevinkt. */
 export function hashDoel(d: Doel): string {
   return JSON.stringify([
     d.soort,
@@ -96,7 +96,7 @@ export function hashDoel(d: Doel): string {
     d.lijstje,
     d.moment,
     d.jaarlijks,
-    d.soort === 'tasks' && d.af,
+    d.af,
   ])
 }
 
@@ -164,11 +164,12 @@ export function agendaBody(d: Doel, tz: string = tijdzone()) {
         },
       }
   return {
-    summary: d.titel,
+    // Afgevinkt: het agenda-item blijft staan, met een vinkje voor de titel en zonder melding (F48).
+    summary: d.af ? `✓ ${d.titel}` : d.titel,
     description: beschrijving(d),
     ...tijden,
     recurrence: d.jaarlijks ? ['RRULE:FREQ=YEARLY'] : [],
-    reminders: { useDefault: true },
+    reminders: d.af ? { useDefault: false, overrides: [] } : { useDefault: true },
   }
 }
 

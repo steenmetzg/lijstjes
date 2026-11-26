@@ -170,9 +170,14 @@ describe('AC51: Lijstjes houdt Google bij', () => {
     }
     // Het weggegooide item gaat weg bij Google; de rest klopt al.
     expect(plan(gewenst, opslag).map((a) => [a.soort, a.itemId])).toEqual([['weg', 'weg']])
-    // Afvinken: de taak wordt afgevinkt, het agenda-item blijft staan.
+    // Afvinken: de taak wordt afgevinkt, het agenda-item blijft staan met een vinkje en zonder melding.
     const af = doelen([afspraken({ items: afspraken().items.map((i) => ({ ...i, af: true })) })])
+    expect(agendaBody(af.get('t')!, 'Europe/Amsterdam')).toMatchObject({
+      summary: '✓ tandarts',
+      reminders: { useDefault: false, overrides: [] },
+    })
     expect(plan(af, opslag).map((a) => [a.soort, a.itemId])).toEqual([
+      ['wijzig', 't'],
       ['wijzig', 'p'],
       ['weg', 'weg'],
     ])
