@@ -143,7 +143,7 @@ export function SyncKeuze({
             'Het hele lijstje',
             heel,
             setHeel,
-            `Het hele lijstje komt als "${naam}" in Google Tasks met alle items, ook zonder datum. De lijstjes worden gelijk gehouden.`,
+            `Dit lijstje wordt in z'n geheel als "${naam}" in Google Tasks gezet. De lijstjes worden gelijk gehouden.`,
           )}
           <p className="google-uitleg sync-inlog">
             {ingelogd ? 'Ingelogd bij Google' : 'Niet ingelogd bij Google'}{' '}

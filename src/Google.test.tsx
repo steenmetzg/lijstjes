@@ -621,7 +621,7 @@ describe('AC56: het hele lijstje in Google Tasks', () => {
     expect(schakelaar).not.toBeChecked()
     expect(
       within(sync).getByText(
-        /Het hele lijstje komt als "Afspraken" in Google Tasks met alle items, ook zonder datum. De lijstjes worden gelijk gehouden./,
+        /Dit lijstje wordt in z'n geheel als "Afspraken" in Google Tasks gezet. De lijstjes worden gelijk gehouden./,
       ),
     ).toBeInTheDocument()
     await user.click(schakelaar)
