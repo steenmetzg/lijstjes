@@ -143,7 +143,7 @@ export function SyncKeuze({
             'Het hele lijstje',
             heel,
             setHeel,
-            `Een eigen lijst "${naam}" in Google Tasks met alle items, ook zonder datum. Afvinken gaat beide kanten op.`,
+            `Het hele lijstje komt als "${naam}" in Google Tasks met alle items, ook zonder datum. De lijstjes worden gelijk gehouden.`,
           )}
           <p className="google-uitleg sync-inlog">
             {ingelogd ? 'Ingelogd bij Google' : 'Niet ingelogd bij Google'}{' '}
