@@ -321,10 +321,7 @@ function ItemRow({
             </span>
             {wanneer && (
               <span className={isVoorbij(wanneer, undefined, jaarlijks) ? 'item-when past' : 'item-when'}>
-                {formatWanneer(wanneer, undefined, jaarlijks)}
-                {inAgenda && !inGoogle && (
-                  <CalendarCheck className="item-in-agenda" size={14} strokeWidth={2} aria-label="staat in je agenda" />
-                )}
+                {/* Vóór de datum: staat het item in Google Agenda of Google Tasks (F48)? */}
                 {inGoogle === 'agenda' && (
                   <CalendarCheck
                     className="item-in-agenda"
@@ -335,6 +332,10 @@ function ItemRow({
                 )}
                 {inGoogle === 'tasks' && (
                   <ListChecks className="item-in-agenda" size={14} strokeWidth={2} aria-label="staat in Google Tasks" />
+                )}
+                {formatWanneer(wanneer, undefined, jaarlijks)}
+                {inAgenda && !inGoogle && (
+                  <CalendarCheck className="item-in-agenda" size={14} strokeWidth={2} aria-label="staat in je agenda" />
                 )}
               </span>
             )}
@@ -961,13 +962,6 @@ export default function ListView({
                     onChange={(e) => setDetail({ ...detail, google: e.target.checked })}
                   />
                 </label>
-                <p className="google-uitleg">
-                  {!detail.datum
-                    ? 'Met een datum kan het item in Google.'
-                    : googleNaarAgenda
-                      ? 'Met tijd: Google Agenda, met de meldingen van je agenda.'
-                      : `Zonder tijd: Google Tasks${tijd ? '; met een tijd komt het in Google Agenda' : ''}.`}
-                </p>
               </div>
             )}
             <div className="confirm-buttons">
@@ -1159,7 +1153,7 @@ export default function ListView({
                   </div>
                   <p className="google-uitleg">
                     {instellen.googleAlle
-                      ? 'Met tijd in Google Agenda, zonder tijd in Google Tasks. In het kaartje van een item kun je het uitzetten.'
+                      ? 'Dit lijstje zet items met een tijd in jouw Google Agenda, en items zonder tijd in Google Tasks. Per item kan je dit uitzetten.'
                       : 'Uit: je kiest in het kaartje van elk item of het in Google komt.'}
                   </p>
                   <p className="google-uitleg">
