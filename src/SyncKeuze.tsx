@@ -136,7 +136,7 @@ export function SyncKeuze({
               alle,
               setAlle,
               alle
-                ? 'Dit lijstje zet items met een tijd in jouw Google Agenda, en items zonder tijd in Google Tasks. Per item kan je dit uitzetten.'
+                ? 'Dit lijstje zet items met een tijd in Google Agenda, zonder tijd in Google Tasks, en zonder jaar elk jaar in Google Agenda. Per item kan je dit uitzetten.'
                 : 'Uit: je kiest in het kaartje van elk item of het in Google komt.',
             )}
           {schakelaar(
