@@ -141,8 +141,9 @@ describe('AC26: datum en tijd', () => {
     const user = userEvent.setup()
     render(<App />)
     expect(itemTexts()).toEqual(['Tandarts', 'Anne bellen', 'APK'])
-    // Op datum: geen greep om te verplaatsen.
-    expect(screen.queryByRole('button', { name: 'APK verplaatsen' })).not.toBeInTheDocument()
+    // Een item met een datum staat op datum: geen greep om te verplaatsen; zonder datum wel (F28, F33).
+    expect(screen.queryByRole('button', { name: 'Tandarts verplaatsen' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'APK verplaatsen' })).toBeInTheDocument()
     await setDate(user, 'APK', '2026-11-08', '14:00')
     expect(screen.getByText('zo 8 nov 14:00')).toBeInTheDocument()
     expect(screen.getByText('do 12 nov 09:30')).toBeInTheDocument()
@@ -243,6 +244,35 @@ describe('AC26: datum en tijd', () => {
       { id: 'd', wanneer: '2026-11-20' },
     ]
     expect(opDatum(items).map((i) => i.id)).toEqual(['d', 'b', 'a', 'c'])
+  })
+})
+
+describe('AC57: items zonder datum verplaatsen', () => {
+  const opgeslagen = () => loadLijstjes()[0].items.map((i) => i.tekst)
+
+  it('versleept items zonder datum onder elkaar, maar niet boven de items met een datum', () => {
+    storeAfspraken({ 'Anne bellen': { wanneer: '2026-11-12T09:30' } })
+    render(<App />)
+    expect(itemTexts()).toEqual(['Anne bellen', 'Tandarts', 'APK'])
+    expect(screen.queryByRole('button', { name: 'Anne bellen verplaatsen' })).not.toBeInTheDocument()
+
+    // Met het toetsenbord: APK een plek omhoog, daarna niet verder (daar staat het item met een datum).
+    const apk = screen.getByRole('button', { name: 'APK verplaatsen' })
+    fireEvent.keyDown(apk, { key: 'ArrowUp' })
+    expect(itemTexts()).toEqual(['Anne bellen', 'APK', 'Tandarts'])
+    expect(opgeslagen()).toEqual(['APK', 'Tandarts', 'Anne bellen'])
+    fireEvent.keyDown(screen.getByRole('button', { name: 'APK verplaatsen' }), { key: 'ArrowUp' })
+    expect(itemTexts()).toEqual(['Anne bellen', 'APK', 'Tandarts'])
+
+    // Slepen: Tandarts helemaal naar boven komt niet hoger dan net onder het item met een datum.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 48 } as DOMRect)
+    const grip = screen.getByRole('button', { name: 'Tandarts verplaatsen' })
+    fireEvent.pointerDown(grip, { pointerId: 1, clientY: 300 })
+    fireEvent.pointerMove(grip, { pointerId: 1, clientY: 0 })
+    fireEvent.pointerUp(grip, { pointerId: 1, clientY: 0 })
+    vi.restoreAllMocks()
+    expect(itemTexts()).toEqual(['Anne bellen', 'Tandarts', 'APK'])
+    expect(opgeslagen()).toEqual(['Tandarts', 'APK', 'Anne bellen'])
   })
 })
 
