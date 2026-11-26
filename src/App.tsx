@@ -468,6 +468,12 @@ export default function App() {
       onAddDetails={addWithDetails}
       onFout={(text, veld) => setNotice({ kind: 'error', text, ...(veld && { veld }) })}
       onAgenda={agenda}
+      onGoogleAlle={(alle) =>
+        update(lijstje.id, (x) => {
+          const { googleAlle: _alle, ...rest } = x
+          return alle ? rest : { ...rest, googleAlle: false as const }
+        })
+      }
       google={{
         ...google,
         // Bij het omzetten in Google laten staan: niet meer bijhouden, wel onthouden dat ze in je agenda staan (F48).

@@ -32,12 +32,12 @@ export function isAgendaKeuze(value: unknown): value is AgendaKeuze {
   return value === PER_ITEM || value === GOOGLE_AUTO || value === GEEN || isAgenda(value)
 }
 
-/** Hoe de keuze heet op de regel "Agenda: …" in het vak met de schuifjes (F41). */
+/** Hoe de keuze heet op de regel "Synchroniseren of delen: …" in het vak met de schuifjes (F41). */
 export function keuzeLabel(keuze: AgendaKeuze): string {
-  if (keuze === PER_ITEM) return 'per item kiezen'
+  if (keuze === PER_ITEM) return 'zelf per item, elke keer vragen'
   if (keuze === GOOGLE_AUTO) return 'Google, automatisch'
-  if (keuze === GEEN) return 'geen'
-  return agendaLabel(keuze)
+  if (keuze === GEEN) return 'alleen in Lijstjes'
+  return `zelf per item, ${agendaLabel(keuze)}`
 }
 
 export function agendaLabel(agenda: Agenda): string {
