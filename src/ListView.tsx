@@ -481,8 +481,10 @@ export default function ListView({
   } | null>(null)
   // De vraag om in te loggen bij Google, voordat Google, automatisch de agenda wordt (F49).
   const [googleVraag, setGoogleVraag] = useState(false)
-  // Omzetten van Google, automatisch naar een andere keuze: wat met de items die in Google staan (F48)?
-  const [omzetVraag, setOmzetVraag] = useState<{ agenda: AgendaKeuze; ids: string[] } | null>(null)
+  // Omzetten van Google, automatisch naar een andere keuze, of Datum uit: wat met de items die in Google staan (F48)?
+  // `verder` doet daarna het omzetten zelf.
+  const [omzetVraag, setOmzetVraag] = useState<{ ids: string[]; verder: () => void } | null>(null)
+  const idsInGoogle = () => lijstje.items.filter((i) => Object.hasOwn(google.opslag, i.id)).map((i) => i.id)
   const googleAuto = lijstje.agenda === GOOGLE_AUTO
   const googleAlle = lijstje.googleAlle !== false
   // De keuze van de agenda: `voor` is het item dat daarna in de agenda gaat (met `wanneer`), of `null` (F34).
@@ -644,9 +646,9 @@ export default function ListView({
     }
     // Van Google, automatisch naar iets anders, met items in Google: eerst vragen wat ermee moet (F48).
     if (voor === null && googleAuto && agenda !== GOOGLE_AUTO) {
-      const ids = lijstje.items.filter((i) => Object.hasOwn(google.opslag, i.id)).map((i) => i.id)
+      const ids = idsInGoogle()
       if (ids.length > 0) {
-        setOmzetVraag({ agenda, ids })
+        setOmzetVraag({ ids, verder: () => onAgenda(agenda, null) })
         return
       }
     }
@@ -657,7 +659,7 @@ export default function ListView({
   function omzetten(laten: boolean) {
     if (!omzetVraag) return
     if (laten) google.laatStaan(omzetVraag.ids)
-    onAgenda(omzetVraag.agenda, null)
+    omzetVraag.verder()
     setOmzetVraag(null)
   }
 
@@ -1080,14 +1082,20 @@ export default function ListView({
             </span>
           </button>
         </div>
-        {instellen && (
+        {instellen && !omzetVraag && (
           <section className="confirm clear-choice instellen" aria-label="Lijstje aanpassen">
             <form
               onSubmit={(e) => {
                 e.preventDefault()
                 // Een goede naam: bewaren en sluiten; anders blijft het vak open met de melding onderaan (F37).
-                if (onInstellen(instellen.naam, instellen.kenmerken, googleAuto ? instellen.googleAlle : undefined))
-                  setInstellen(null)
+                const bewaar = () => {
+                  if (onInstellen(instellen.naam, instellen.kenmerken, googleAuto ? instellen.googleAlle : undefined))
+                    setInstellen(null)
+                }
+                // Datum uit bij Google, automatisch met items in Google: eerst vragen wat ermee moet (F48).
+                const ids = googleAuto && heeftDatum(lijstje) && !instellen.kenmerken.datum ? idsInGoogle() : []
+                if (ids.length > 0) setOmzetVraag({ ids, verder: bewaar })
+                else bewaar()
               }}
             >
               <label className="field">

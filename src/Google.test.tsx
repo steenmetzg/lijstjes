@@ -418,6 +418,27 @@ describe('AC55: omzetten van Google, automatisch', () => {
     expect(screen.getAllByLabelText('staat in je agenda')).toHaveLength(2)
   })
 
+  it('Datum uit: dezelfde vraag; Annuleren gaat terug naar het vak, Laten staan bewaart', async () => {
+    const methods = inGoogle()
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
+    let vak = screen.getByRole('region', { name: 'Lijstje aanpassen' })
+    await user.click(within(vak).getByRole('switch', { name: 'Datum' }))
+    await user.click(within(vak).getByRole('button', { name: 'Bewaren' }))
+    let vraag = screen.getByRole('region', { name: 'Items in Google' })
+    await user.click(within(vraag).getByRole('button', { name: 'Annuleren' }))
+    vak = screen.getByRole('region', { name: 'Lijstje aanpassen' })
+    expect(within(vak).getByRole('switch', { name: 'Datum' })).not.toBeChecked()
+    await user.click(within(vak).getByRole('button', { name: 'Bewaren' }))
+    vraag = screen.getByRole('region', { name: 'Items in Google' })
+    await user.click(within(vraag).getByRole('button', { name: 'Laten staan' }))
+    await act(() => new Promise((r) => setTimeout(r, 1700)))
+    expect(methods).not.toContain('DELETE')
+    expect(screen.queryByRole('region', { name: 'Lijstje aanpassen' })).not.toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.kenmerken.datum).toBeFalsy()
+  })
+
   it('Weghalen: de items gaan uit Google', async () => {
     const methods = inGoogle()
     await zetOm('Weghalen')
