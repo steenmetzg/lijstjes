@@ -1915,3 +1915,16 @@ html.vak-open body {
 .sync-keuze .sync-schakelaar > .sync-uitleg {
   padding-left: 38px;
 }
+
+/* Het rondje staat midden naast de titel; de uitleg springt in tot onder de titel. */
+.sync-keuze .sync-kop {
+  display: block;
+}
+
+.sync-keuze .sync-titel input {
+  margin: 0 6px 0 0;
+}
+
+.sync-keuze .sync-kop > .sync-uitleg {
+  padding-left: 32px;
+}

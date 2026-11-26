@@ -109,14 +109,12 @@ export function SyncKeuze({
   ) => (
     <div className={hoofd === id ? 'sync-optie gekozen' : 'sync-optie'}>
       <label className="sync-kop">
-        <input type="radio" name="sync" checked={hoofd === id} onChange={() => setHoofd(id)} aria-label={titel} />
-        <span>
-          <span className="sync-titel">
-            <Icoon size={18} strokeWidth={2} aria-hidden />
-            {titel}
-          </span>
-          <span className="sync-uitleg">{uitleg}</span>
+        <span className="sync-titel">
+          <input type="radio" name="sync" checked={hoofd === id} onChange={() => setHoofd(id)} aria-label={titel} />
+          <Icoon size={18} strokeWidth={2} aria-hidden />
+          {titel}
         </span>
+        <span className="sync-uitleg">{uitleg}</span>
       </label>
       {hoofd === id && sub}
     </div>
