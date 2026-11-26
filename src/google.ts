@@ -10,10 +10,12 @@ import { KEY_PREFIX } from './storageKey'
  * Het Client-ID van het Google Cloud-project van Lijstjes (een webclient met als JavaScript-oorsprong
  * https://steenmetzg.github.io). Dit ID is niet geheim. Leeg: Google, automatisch is nog niet ingesteld (F48).
  */
-const CLIENT_ID = ''
+const CLIENT_ID = '343927118158-nfff51nmvcq8f6mhols7ih3udoieqkb8.apps.googleusercontent.com'
 
 export function googleClientId(): string {
-  return import.meta.env.VITE_GOOGLE_CLIENT_ID || CLIENT_ID
+  // Bij het bouwen (of in een test) kan VITE_GOOGLE_CLIENT_ID het vervangen; leeg betekent: niet ingesteld.
+  const env: string | undefined = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  return env ?? CLIENT_ID
 }
 
 /** Alleen agenda-items en taken maken, wijzigen en verwijderen; Lijstjes leest verder niets van je account. */
