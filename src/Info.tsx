@@ -61,7 +61,7 @@ export default function Info({ onClose }: Props) {
         <p>Met een backup bewaar je al je lijstjes in een bestand en zet je ze terug, ook op een andere telefoon.</p>
         <p>
           Lijstjes telt anoniem hoe vaak de app wordt geïnstalleerd en geopend; wat je op je lijstjes zet, wordt nooit
-          verstuurd.
+          verstuurd, behalve naar Google als je bij een lijstje Google, automatisch kiest.
         </p>
       </section>
     </main>
