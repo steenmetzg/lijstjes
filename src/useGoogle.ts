@@ -1,10 +1,12 @@
 // Houdt Google Agenda en Google Tasks gelijk met de lijstjes (F48, F49): kort na elke wijziging, bij het openen en
-// als je terugkomt in de app of weer internet hebt.
+// als je terugkomt in de app of weer internet hebt. Als je een lijstje opent, kijkt de app of je items ervan bij Google
+// zelf hebt verwijderd; die zet hij uit in plaats van ze opnieuw te maken.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GOOGLE_AUTO } from './agenda'
 import {
   bijwerken,
+  controleer,
   doelen,
   googleClientId,
   GoogleFout,
@@ -38,17 +40,28 @@ export interface GoogleStaat {
   bijTik: () => void
 }
 
-export function useGoogle(lijstjes: readonly Lijstje[]): GoogleStaat {
+/**
+ * `open`: het lijstje dat nu open staat (`null`: geen). `onVerdwenen`: items die bij Google zelf zijn verwijderd; zet
+ * daar de schakelaar uit (F48).
+ */
+export function useGoogle(
+  lijstjes: readonly Lijstje[],
+  open: string | null = null,
+  onVerdwenen: (itemIds: string[]) => void = () => {},
+): GoogleStaat {
   const [opslag, setOpslag] = useState<GoogleOpslag>(loadOpslag)
   const [ingelogd, setIngelogd] = useState(isIngelogd)
   const [inloggenNodig, setInloggenNodig] = useState(false)
   const [ronde, setRonde] = useState(0)
   const bezig = useRef(false)
   const opnieuw = useRef(false)
-  const actueel = useRef({ lijstjes, opslag })
+  const actueel = useRef({ lijstjes, opslag, onVerdwenen })
   useEffect(() => {
-    actueel.current = { lijstjes, opslag }
-  }, [lijstjes, opslag])
+    actueel.current = { lijstjes, opslag, onVerdwenen }
+  }, [lijstjes, opslag, onVerdwenen])
+  // Het lijstje waarvan nog moet worden gekeken of de items nog bij Google staan.
+  const nakijken = useRef<string | null>(null)
+  const vorigOpen = useRef<string | null>(null)
   const gebruikt = lijstjes.some((l) => l.agenda === GOOGLE_AUTO) || Object.keys(opslag).length > 0
 
   // Het script van Google vooraf laden, zodat inloggen bij een tik meteen het venster kan openen.
@@ -62,7 +75,11 @@ export function useGoogle(lijstjes: readonly Lijstje[]): GoogleStaat {
       return
     }
     const { lijstjes: l, opslag: o } = actueel.current
-    if (plan(doelen(l), o).length === 0) {
+    const lijstId = nakijken.current
+    nakijken.current = null
+    const items = new Set(l.find((x) => x.id === lijstId)?.items.map((i) => i.id) ?? [])
+    const teControleren = Object.fromEntries(Object.entries(o).filter(([id]) => items.has(id)))
+    if (plan(doelen(l), o).length === 0 && Object.keys(teControleren).length === 0) {
       setInloggenNodig(false)
       return
     }
@@ -72,12 +89,22 @@ export function useGoogle(lijstjes: readonly Lijstje[]): GoogleStaat {
       return
     }
     bezig.current = true
+    const bewaar = (nieuw: GoogleOpslag) => {
+      saveOpslag(nieuw)
+      actueel.current.opslag = nieuw
+      setOpslag(nieuw)
+    }
     try {
-      await bijwerken(token, l, o, (nieuw) => {
-        saveOpslag(nieuw)
-        actueel.current.opslag = nieuw
-        setOpslag(nieuw)
-      })
+      const verdwenen = await controleer(token, teControleren)
+      if (verdwenen.length > 0) {
+        const nieuw = { ...actueel.current.opslag }
+        for (const id of verdwenen) delete nieuw[id]
+        bewaar(nieuw)
+        // De schakelaars gaan uit; daarna (met de nieuwe lijstjes) pas verder bijwerken.
+        actueel.current.onVerdwenen(verdwenen)
+        return
+      }
+      await bijwerken(token, l, actueel.current.opslag, bewaar, (ids) => actueel.current.onVerdwenen(ids))
       setInloggenNodig(false)
     } catch (e) {
       if (e instanceof GoogleFout && (e.status === 401 || e.status === 403)) {
@@ -95,10 +122,15 @@ export function useGoogle(lijstjes: readonly Lijstje[]): GoogleStaat {
   }, [])
 
   useEffect(() => {
+    // Net een lijstje geopend: dat nakijken.
+    if (open !== vorigOpen.current) {
+      vorigOpen.current = open
+      if (open) nakijken.current = open
+    }
     if (!gebruikt) return
     const timer = setTimeout(() => void verwerk(), WACHT_MS)
     return () => clearTimeout(timer)
-  }, [lijstjes, gebruikt, ronde, verwerk])
+  }, [lijstjes, gebruikt, ronde, verwerk, open])
 
   useEffect(() => {
     const nogEens = () => {
