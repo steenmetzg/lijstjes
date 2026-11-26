@@ -13,7 +13,7 @@
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
   '1.9.0':
-    'Kies bij een lijstje met datums [schuifjes] Google, automatisch: items met een tijd komen dan vanzelf in Google Agenda, items zonder tijd in Google Tasks. Of kies Geen agenda.',
+    'Kies bij een lijstje met datums [schuifjes] Synchroniseren of delen: met Google, automatisch komen items met een tijd vanzelf in Google Agenda, items zonder tijd in Google Tasks. Of zet ze zelf per item in je agenda, of alleen in Lijstjes.',
   '1.8.6': 'De naam van een lijstje mag nu 50 tekens lang zijn. De rondjes en knoppen op Mijn lijstjes staan dichter bij elkaar.',
   // Alleen de rondjes en knoppen op Mijn lijstjes netjes uitgelijnd: geen eigen tekst.
   '1.8.5': '',

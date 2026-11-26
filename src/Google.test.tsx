@@ -36,6 +36,14 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
+/** Kiest in Synchroniseren of delen een hoofdkeuze (en een agenda) en tikt op Bewaren. */
+async function kies(user: ReturnType<typeof userEvent.setup>, naam: string, agenda?: string) {
+  const k = screen.getByRole('region', { name: 'Agenda kiezen' })
+  await user.click(within(k).getByRole('radio', { name: naam }))
+  if (agenda) await user.click(within(k).getByRole('button', { name: agenda }))
+  await user.click(within(k).getByRole('button', { name: 'Bewaren' }))
+}
+
 function afspraken(extra: Partial<Lijstje> = {}): Lijstje {
   return {
     id: 'h',
@@ -213,11 +221,13 @@ describe('AC52: Geen agenda', () => {
     render(<App />)
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
     await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
-    await user.click(screen.getByRole('button', { name: 'Geen agenda' }))
+    await kies(user, 'Alleen in Lijstjes')
     expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.agenda).toBe('geen')
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
     expect(
-      within(screen.getByRole('region', { name: 'Lijstje aanpassen' })).getByText(/Agenda: geen/),
+      within(screen.getByRole('region', { name: 'Lijstje aanpassen' })).getByText(
+        /Synchroniseren of delen: alleen in Lijstjes/,
+      ),
     ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Annuleren' }))
     await user.click(screen.getByRole('button', { name: 'tandarts aanpassen' }))
@@ -235,7 +245,7 @@ describe('AC53: Google, automatisch kiezen en inloggen', () => {
     render(<App />)
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
     await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
-    await user.click(screen.getByRole('button', { name: 'Google, automatisch' }))
+    await kies(user, 'Google, automatisch')
     expect(screen.getByText('Google, automatisch is in deze versie nog niet ingesteld.')).toBeInTheDocument()
     expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.agenda).toBe('google')
   })
@@ -247,7 +257,7 @@ describe('AC53: Google, automatisch kiezen en inloggen', () => {
     render(<App />)
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
     await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
-    await user.click(screen.getByRole('button', { name: 'Google, automatisch' }))
+    await kies(user, 'Google, automatisch')
     const vraag = screen.getByRole('region', { name: 'Inloggen bij Google' })
     expect(within(vraag).getByText(/Je items gaan dan naar Google, verder nergens heen/)).toBeInTheDocument()
     await user.click(within(vraag).getByRole('button', { name: 'Annuleren' }))
@@ -268,7 +278,7 @@ describe('AC53: Google, automatisch kiezen en inloggen', () => {
     render(<App />)
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
     await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
-    await user.click(screen.getByRole('button', { name: 'Google, automatisch' }))
+    await kies(user, 'Google, automatisch')
     expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.agenda).toBe('google-auto')
 
     // Na even wachten staan tandarts en paspoort in Google, met een icoontje.
@@ -280,10 +290,14 @@ describe('AC53: Google, automatisch kiezen en inloggen', () => {
     // In het vak met de schuifjes: Alle items met een datum, en Uitloggen.
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
     const vak = screen.getByRole('region', { name: 'Lijstje aanpassen' })
-    expect(within(vak).getByText(/Agenda: Google, automatisch/)).toBeInTheDocument()
-    expect(within(vak).getByRole('switch', { name: 'Alle items met een datum' })).toBeChecked()
-    expect(within(vak).getByRole('button', { name: 'Uitloggen' })).toBeInTheDocument()
-    await user.click(within(vak).getByRole('button', { name: 'Annuleren' }))
+    expect(within(vak).getByText(/Synchroniseren of delen: Google, automatisch/)).toBeInTheDocument()
+    await user.click(within(vak).getByRole('button', { name: 'Wijzigen' }))
+    const sync = screen.getByRole('region', { name: 'Agenda kiezen' })
+    expect(within(sync).getByText('Afspraken synchroniseren of delen')).toBeInTheDocument()
+    expect(within(sync).getByRole('radio', { name: 'Google, automatisch' })).toBeChecked()
+    expect(within(sync).getByRole('switch', { name: 'Items met een datum' })).toBeChecked()
+    expect(within(sync).getByRole('button', { name: 'Uitloggen' })).toBeInTheDocument()
+    await user.click(within(sync).getByRole('button', { name: 'Annuleren' }))
 
     // In het kaartje: In Google Agenda met tijd, In Google Tasks zonder tijd; uitzetten bij paspoort.
     await user.click(screen.getByRole('button', { name: 'tandarts aanpassen' }))
@@ -398,7 +412,7 @@ describe('AC55: omzetten van Google, automatisch', () => {
     render(<App />)
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
     await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
-    await user.click(screen.getByRole('button', { name: 'Per item kiezen' }))
+    await kies(user, 'Zelf per item in je agenda')
     const vraag = screen.getByRole('region', { name: 'Items in Google' })
     expect(
       within(vraag).getByText(/2 items van dit lijstje staan in Google Agenda of Google Tasks/),

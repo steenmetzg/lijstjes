@@ -49,6 +49,7 @@ import {
 } from './lists'
 import { doelen, staatInGoogle, type GoogleOpslag, type Soort } from './google'
 import { MoreAbove, MoreBelow } from './MoreItems'
+import { SyncKeuze } from './SyncKeuze'
 import { useScrollList, type Grip } from './scrollList'
 import { gesprokenMoment } from './spraakDatum'
 import { spokenTekst } from './speech'
@@ -135,6 +136,8 @@ interface Props {
    * `false` als de naam niet kan (de melding staat dan onderaan) (F37, F41, F48).
    */
   onInstellen: (naam: string, kenmerken: Kenmerken, googleAlle?: boolean) => boolean
+  /** Google, automatisch: de schakelaar Items met een datum (F48). */
+  onGoogleAlle: (alle: boolean) => void
   /** Google, automatisch (F48, F49). */
   google: {
     /** Is Google, automatisch in deze versie ingesteld? */
@@ -469,6 +472,7 @@ export default function ListView({
   onAgenda,
   reminders,
   onInstellen,
+  onGoogleAlle,
   google,
 }: Props) {
   const [text, setText] = useState('')
@@ -476,8 +480,6 @@ export default function ListView({
   const [instellen, setInstellen] = useState<{
     naam: string
     kenmerken: Kenmerken
-    /** Met Google, automatisch: Alle items met een datum (F48). */
-    googleAlle: boolean
   } | null>(null)
   // De vraag om in te loggen bij Google, voordat Google, automatisch de agenda wordt (F49).
   const [googleVraag, setGoogleVraag] = useState(false)
@@ -1044,7 +1046,6 @@ export default function ListView({
                     tijd: lijstje.kenmerken?.tijd === true,
                     zonderJaar: lijstje.kenmerken?.zonderJaar === true,
                   },
-                  googleAlle,
                 })
             }}
           >
@@ -1089,8 +1090,7 @@ export default function ListView({
                 e.preventDefault()
                 // Een goede naam: bewaren en sluiten; anders blijft het vak open met de melding onderaan (F37).
                 const bewaar = () => {
-                  if (onInstellen(instellen.naam, instellen.kenmerken, googleAuto ? instellen.googleAlle : undefined))
-                    setInstellen(null)
+                  if (onInstellen(instellen.naam, instellen.kenmerken)) setInstellen(null)
                 }
                 // Datum uit bij Google, automatisch met items in Google: eerst vragen wat ermee moet (F48).
                 const ids = googleAuto && heeftDatum(lijstje) && !instellen.kenmerken.datum ? idsInGoogle() : []
@@ -1150,7 +1150,7 @@ export default function ListView({
               </div>
               {instellen.kenmerken.datum && (
                 <p className="instellen-agenda">
-                  Agenda: {lijstje.agenda ? keuzeLabel(lijstje.agenda) : 'nog niet gekozen'}{' '}
+                  Synchroniseren of delen: {lijstje.agenda ? keuzeLabel(lijstje.agenda) : 'nog niet gekozen'}{' '}
                   <button
                     type="button"
                     className="link-button"
@@ -1163,39 +1163,6 @@ export default function ListView({
                   </button>
                 </p>
               )}
-              {instellen.kenmerken.datum && googleAuto && (
-                // Google, automatisch: alle items met een datum, of per item kiezen in het kaartje (F48).
-                <>
-                  <div className="kenmerken">
-                    <label className="kenmerk">
-                      <span>Alle items met een datum</span>
-                      <input
-                        type="checkbox"
-                        role="switch"
-                        className="herinnering-switch"
-                        aria-label="Alle items met een datum"
-                        checked={instellen.googleAlle}
-                        onChange={(e) => setInstellen({ ...instellen, googleAlle: e.target.checked })}
-                      />
-                    </label>
-                  </div>
-                  <p className="google-uitleg">
-                    {instellen.googleAlle
-                      ? 'Dit lijstje zet items met een tijd in jouw Google Agenda, en items zonder tijd in Google Tasks. Per item kan je dit uitzetten.'
-                      : 'Uit: je kiest in het kaartje van elk item of het in Google komt.'}
-                  </p>
-                  <p className="google-uitleg">
-                    {google.ingelogd ? 'Ingelogd bij Google' : 'Niet ingelogd bij Google'}{' '}
-                    <button
-                      type="button"
-                      className="link-button"
-                      onClick={() => (google.ingelogd ? google.uitloggen() : void google.inloggen())}
-                    >
-                      {google.ingelogd ? 'Uitloggen' : 'Inloggen'}
-                    </button>
-                  </p>
-                </>
-              )}
               <div className="confirm-buttons">
                 <button type="button" className="cancel-half" onClick={() => setInstellen(null)}>
                   Annuleren
@@ -1207,69 +1174,39 @@ export default function ListView({
             </form>
           </section>
         )}
-        {choosing && (
+        {choosing && !choosing.voor && (
+          // Synchroniseren of delen: drie hoofdkeuzes (F34, F48, F50).
+          <SyncKeuze
+            naam={lijstje.naam}
+            huidig={lijstje.agenda}
+            googleAlle={googleAlle}
+            ingelogd={google.ingelogd}
+            onInloggen={() => void google.inloggen()}
+            onUitloggen={google.uitloggen}
+            onAnnuleren={() => setChoosing(null)}
+            onBewaren={(keuze, alle) => {
+              if (keuze === GOOGLE_AUTO && alle !== googleAlle) onGoogleAlle(alle)
+              choose(keuze)
+            }}
+          />
+        )}
+        {choosing?.voor && (
           <section className="confirm clear-choice agenda-choice" aria-label="Agenda kiezen">
-            <strong>{choosing.voor ? 'In welke agenda?' : `Agenda voor ${lijstje.naam}`}</strong>
+            <strong>In welke agenda?</strong>
             <p>
-              {choosing.voor && lijstje.agenda === PER_ITEM
+              {lijstje.agenda === PER_ITEM
                 ? 'Kies waar je dit item ook op wilt nemen.'
-                : choosing.voor
-                  ? `Datums worden altijd in Lijstjes getoond. Kies hieronder waar je ze ook op wilt nemen. Je keuze geldt alleen voor dit lijstje (${lijstje.naam}).`
-                  : `Datums worden altijd in Lijstjes getoond. Met Google, automatisch komen items met een datum en tijd in Google Agenda en items met alleen een datum in Google Tasks, en houdt Lijstjes ze daar bij. Je keuze geldt alleen voor dit lijstje (${lijstje.naam}).`}
+                : `Datums worden altijd in Lijstjes getoond. Kies hieronder waar je ze ook op wilt nemen. Je keuze geldt alleen voor dit lijstje (${lijstje.naam}).`}
             </p>
             <div className="confirm-buttons">
-              {!choosing.voor && (
-                <>
-                  <button
-                    type="button"
-                    className={googleAuto ? 'confirm-yes wide' : 'wide'}
-                    aria-pressed={googleAuto}
-                    onClick={() => choose(GOOGLE_AUTO)}
-                  >
-                    Google, automatisch
-                  </button>
-                  <p className="keuze-kop">Of zelf per item in de agenda zetten:</p>
-                </>
-              )}
               {AGENDAS.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  className={!choosing.voor && lijstje.agenda === a.id ? 'confirm-yes' : undefined}
-                  aria-pressed={!choosing.voor ? lijstje.agenda === a.id : undefined}
-                  onClick={() => choose(a.id)}
-                >
+                <button key={a.id} type="button" onClick={() => choose(a.id)}>
                   {a.label}
                 </button>
               ))}
-              {choosing.voor ? (
-                <button type="button" className="cancel-half" onClick={() => setChoosing(null)}>
-                  Annuleren
-                </button>
-              ) : (
-                // Geen vaste agenda: bij elk item vragen welke (F34). Precies één van de zes is gekozen.
-                <button
-                  type="button"
-                  className={lijstje.agenda === PER_ITEM ? 'confirm-yes' : undefined}
-                  aria-pressed={lijstje.agenda === PER_ITEM}
-                  onClick={() => choose(PER_ITEM)}
-                >
-                  Per item kiezen
-                </button>
-              )}
-              {!choosing.voor && (
-                <>
-                  <p className="keuze-kop">Of alleen in Lijstjes:</p>
-                  <button
-                    type="button"
-                    className={lijstje.agenda === GEEN ? 'confirm-yes wide' : 'wide'}
-                    aria-pressed={lijstje.agenda === GEEN}
-                    onClick={() => choose(GEEN)}
-                  >
-                    Geen agenda
-                  </button>
-                </>
-              )}
+              <button type="button" className="cancel-half" onClick={() => setChoosing(null)}>
+                Annuleren
+              </button>
             </div>
           </section>
         )}
