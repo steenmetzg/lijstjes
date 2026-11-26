@@ -619,7 +619,11 @@ describe('AC56: het hele lijstje in Google Tasks', () => {
     const sync = screen.getByRole('region', { name: 'Agenda kiezen' })
     const schakelaar = within(sync).getByRole('switch', { name: 'Het hele lijstje' })
     expect(schakelaar).not.toBeChecked()
-    expect(within(sync).getByText(/Een eigen lijst "Afspraken" in Google Tasks met alle items/)).toBeInTheDocument()
+    expect(
+      within(sync).getByText(
+        /Het hele lijstje komt als "Afspraken" in Google Tasks met alle items, ook zonder datum. De lijstjes worden gelijk gehouden./,
+      ),
+    ).toBeInTheDocument()
     await user.click(schakelaar)
     await user.click(within(sync).getByRole('button', { name: 'Bewaren' }))
     expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.googleLijst).toBe(true)
