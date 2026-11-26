@@ -732,6 +732,15 @@ h2 {
   grid-template-columns: 1fr 1fr;
 }
 
+/* Drie knoppen naast elkaar: Annuleren, Weghalen, Laten staan (F48). */
+.clear-choice .confirm-buttons.drie {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.clear-choice .confirm-buttons.drie button {
+  padding: 0 6px;
+}
+
 /* Knoppen met twee regels tekst: wat kleinere regelafstand en wat meer ruimte boven en onder. */
 .clear-choice .confirm-buttons button {
   min-height: 48px;

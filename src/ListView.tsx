@@ -144,6 +144,8 @@ interface Props {
     /** Inloggen bij een tik; `true` als het gelukt is. */
     inloggen: () => Promise<boolean>
     uitloggen: () => void
+    /** Bij het omzetten: deze items in Google laten staan (F48). */
+    laatStaan: (itemIds: string[]) => void
   }
 }
 
@@ -479,6 +481,8 @@ export default function ListView({
   } | null>(null)
   // De vraag om in te loggen bij Google, voordat Google, automatisch de agenda wordt (F49).
   const [googleVraag, setGoogleVraag] = useState(false)
+  // Omzetten van Google, automatisch naar een andere keuze: wat met de items die in Google staan (F48)?
+  const [omzetVraag, setOmzetVraag] = useState<{ agenda: AgendaKeuze; ids: string[] } | null>(null)
   const googleAuto = lijstje.agenda === GOOGLE_AUTO
   const googleAlle = lijstje.googleAlle !== false
   // De keuze van de agenda: `voor` is het item dat daarna in de agenda gaat (met `wanneer`), of `null` (F34).
@@ -638,7 +642,23 @@ export default function ListView({
       setGoogleVraag(true)
       return
     }
+    // Van Google, automatisch naar iets anders, met items in Google: eerst vragen wat ermee moet (F48).
+    if (voor === null && googleAuto && agenda !== GOOGLE_AUTO) {
+      const ids = lijstje.items.filter((i) => Object.hasOwn(google.opslag, i.id)).map((i) => i.id)
+      if (ids.length > 0) {
+        setOmzetVraag({ agenda, ids })
+        return
+      }
+    }
     onAgenda(agenda, voor, wanneer, titel)
+  }
+
+  /** Antwoord op de vraag bij het omzetten: de items in Google laten staan of weghalen (F48). */
+  function omzetten(laten: boolean) {
+    if (!omzetVraag) return
+    if (laten) google.laatStaan(omzetVraag.ids)
+    onAgenda(omzetVraag.agenda, null)
+    setOmzetVraag(null)
   }
 
   /** Inloggen bij Google vanuit de vraag; gelukt, dan wordt Google, automatisch de agenda van het lijstje (F49). */
@@ -654,7 +674,7 @@ export default function ListView({
 
   // Staat er een vak open in de titelbalk, dan scrolt het lijstje erachter niet mee. Het kaartje van een item staat
   // in het lijstje zelf; dan scrolt het lijstje gewoon (F42).
-  const vakOpen = instellen !== null || choosing !== null || googleVraag
+  const vakOpen = instellen !== null || choosing !== null || googleVraag || omzetVraag !== null
   useEffect(() => {
     if (!vakOpen) return
     document.documentElement.classList.add('vak-open')
@@ -1259,6 +1279,28 @@ export default function ListView({
               </button>
               <button type="button" className="confirm-yes" onClick={googleInloggen}>
                 Inloggen
+              </button>
+            </div>
+          </section>
+        )}
+        {omzetVraag && (
+          <section className="confirm clear-choice agenda-choice" aria-label="Items in Google">
+            <strong>Items in Google</strong>
+            <p>
+              {omzetVraag.ids.length === 1
+                ? '1 item van dit lijstje staat in Google Agenda of Google Tasks.'
+                : `${omzetVraag.ids.length} items van dit lijstje staan in Google Agenda of Google Tasks.`}{' '}
+              Laat je ze staan, dan past Lijstjes ze daar niet meer aan. Haal je ze weg, dan verdwijnen ze uit Google.
+            </p>
+            <div className="confirm-buttons drie">
+              <button type="button" className="cancel-half" onClick={() => setOmzetVraag(null)}>
+                Annuleren
+              </button>
+              <button type="button" className="cancel-half" onClick={() => omzetten(false)}>
+                Weghalen
+              </button>
+              <button type="button" className="confirm-yes" onClick={() => omzetten(true)}>
+                Laten staan
               </button>
             </div>
           </section>

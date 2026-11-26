@@ -369,3 +369,59 @@ describe('AC54: bij Google zelf verwijderd', () => {
     expect(m.items[0].google).toBeUndefined()
   })
 })
+
+describe('AC55: omzetten van Google, automatisch', () => {
+  function inGoogle() {
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-id')
+    localStorage.setItem(INGELOGD_KEY, '1')
+    localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: 'tok', tot: Date.now() + 3600000 }))
+    const methods: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        methods.push(init.method ?? 'GET')
+        return init.method === 'DELETE'
+          ? new Response(null, { status: 204 })
+          : new Response(JSON.stringify({ id: 'x' }))
+      }),
+    )
+    storeAfspraken(afspraken())
+    localStorage.setItem(
+      GOOGLE_KEY,
+      JSON.stringify({ 'h-0': { soort: 'agenda', id: 'a', hash: '' }, 'h-1': { soort: 'tasks', id: 'b', hash: '' } }),
+    )
+    return methods
+  }
+
+  async function zetOm(knop: string) {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
+    await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
+    await user.click(screen.getByRole('button', { name: 'Per item kiezen' }))
+    const vraag = screen.getByRole('region', { name: 'Items in Google' })
+    expect(
+      within(vraag).getByText(/2 items van dit lijstje staan in Google Agenda of Google Tasks/),
+    ).toBeInTheDocument()
+    await user.click(within(vraag).getByRole('button', { name: knop }))
+    await act(() => new Promise((r) => setTimeout(r, 1700)))
+  }
+
+  it('Laten staan: de items blijven in Google en staan in je agenda', async () => {
+    const methods = inGoogle()
+    await zetOm('Laten staan')
+    expect(methods).not.toContain('DELETE')
+    expect(JSON.parse(localStorage.getItem(GOOGLE_KEY)!)).toEqual({})
+    const k = JSON.parse(localStorage.getItem(KENMERKEN_KEY)!)
+    expect(k.lijstjes.h.agenda).toBe('per-item')
+    expect(k.items['h-0'].inAgenda).toBe('2026-11-27T09:30')
+    expect(screen.getAllByLabelText('staat in je agenda')).toHaveLength(2)
+  })
+
+  it('Weghalen: de items gaan uit Google', async () => {
+    const methods = inGoogle()
+    await zetOm('Weghalen')
+    expect(methods.filter((m) => m === 'DELETE')).toHaveLength(2)
+    expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.agenda).toBe('per-item')
+  })
+})

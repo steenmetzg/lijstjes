@@ -18,6 +18,7 @@ import {
   saveCurrent,
   saveLijstjes,
   zetGoogleUit,
+  zetInAgendaGezet,
   capitalize,
   MAX_TEKST,
   sameText,
@@ -467,7 +468,14 @@ export default function App() {
       onAddDetails={addWithDetails}
       onFout={(text, veld) => setNotice({ kind: 'error', text, ...(veld && { veld }) })}
       onAgenda={agenda}
-      google={google}
+      google={{
+        ...google,
+        // Bij het omzetten in Google laten staan: niet meer bijhouden, wel onthouden dat ze in je agenda staan (F48).
+        laatStaan: (ids) => {
+          google.vergeet(ids)
+          setLijstjes((all) => zetInAgendaGezet(all, ids))
+        },
+      }}
       mic={{
         show: speechEnabled && speechSupported(),
         listening: speech.listening,

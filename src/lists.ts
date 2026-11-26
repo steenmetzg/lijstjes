@@ -78,6 +78,23 @@ export function zetGoogleUit(lijstjes: Lijstje[], itemIds: readonly string[]): L
   )
 }
 
+/**
+ * Items die in Google blijven staan als je het lijstje omzet: Lijstjes houdt ze niet meer bij, maar onthoudt dat ze in
+ * je agenda staan, zoals bij In agenda zetten (F34, F48).
+ */
+export function zetInAgendaGezet(lijstjes: Lijstje[], itemIds: readonly string[]): Lijstje[] {
+  return lijstjes.map((l) =>
+    l.items.some((i) => itemIds.includes(i.id))
+      ? {
+          ...l,
+          items: l.items.map((i) =>
+            itemIds.includes(i.id) && i.wanneer ? { ...i, inAgenda: zichtbaar(i.wanneer, heeftTijd(l)) } : i,
+          ),
+        }
+      : l,
+  )
+}
+
 /** Staat Datum aan? Tijd telt alleen samen met Datum (F41). */
 export function heeftDatum(l: Lijstje): boolean {
   return l.kenmerken?.datum === true
