@@ -8,6 +8,7 @@ import {
   agendaBody,
   bijwerken,
   controleer,
+  vergelijkTaken,
   doelen,
   GOOGLE_KEY,
   hashDoel,
@@ -463,5 +464,135 @@ describe('AC55: omzetten van Google, automatisch', () => {
     await zetOm('Weghalen')
     expect(methods.filter((m) => m === 'DELETE')).toHaveLength(2)
     expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.agenda).toBe('per-item')
+  })
+})
+
+describe('AC56: het hele lijstje in Google Tasks', () => {
+  const heel = (extra: Partial<Lijstje> = {}) => afspraken({ googleLijst: true, ...extra })
+  const metLijst: GoogleOpslag = { 'lijst:h': { soort: 'takenlijst', id: 'L1', hash: 'Afspraken' } }
+
+  it('elk item komt als taak in de eigen lijst; met een tijd ook in Google Agenda', () => {
+    const d = doelen([heel()], undefined, metLijst)
+    expect(d.get('t#lijst')).toMatchObject({ soort: 'tasks', moment: '2026-11-27', takenlijst: 'L1' })
+    expect(d.get('p#lijst')).toMatchObject({ soort: 'tasks', moment: '2026-11-28', takenlijst: 'L1' })
+    expect(d.get('c#lijst')).toMatchObject({ soort: 'tasks', moment: '', titel: 'cadeau voor Anne' })
+    expect(d.get('t')?.soort).toBe('agenda')
+    // Paspoort staat al in de eigen lijst, niet nog eens in je standaardlijst.
+    expect(d.has('p')).toBe(false)
+    expect(taakBody(d.get('c#lijst')!).due).toBeNull()
+    // Zonder takenlijst (nog niet gemaakt): nog geen taken in de eigen lijst.
+    expect(doelen([heel()]).has('c#lijst')).toBe(false)
+  })
+
+  it('maakt de takenlijst, zet alle items erin, ook afgevinkte, en haalt de lijst weg als je uitzet', async () => {
+    const calls: { method: string; url: string; body?: string }[] = []
+    let n = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push({ method: init.method!, url, body: init.body as string | undefined })
+        if (init.method === 'DELETE') return new Response(null, { status: 204 })
+        return new Response(JSON.stringify({ id: url.endsWith('/users/@me/lists') ? 'L1' : `id${++n}` }))
+      }),
+    )
+    const l = heel({ items: [...afspraken().items, { id: 'k', tekst: 'kaartje', af: true }] })
+    const opslag = await bijwerken('tok', [l], {}, () => {})
+    expect(calls[0]).toMatchObject({ method: 'POST', url: 'https://tasks.googleapis.com/tasks/v1/users/@me/lists' })
+    expect(JSON.parse(calls[0].body!)).toEqual({ title: 'Afspraken' })
+    const inLijst = calls.filter((c) => c.url === 'https://tasks.googleapis.com/tasks/v1/lists/L1/tasks')
+    expect(inLijst).toHaveLength(4)
+    expect(calls.filter((c) => c.url.includes('calendar'))).toHaveLength(1)
+    expect(opslag['k#lijst']).toMatchObject({ takenlijst: 'L1', af: true })
+
+    // Een andere naam: de takenlijst krijgt die naam ook.
+    calls.length = 0
+    const hernoemd = await bijwerken('tok', [{ ...l, naam: 'Afspraken 2' }], opslag, () => {})
+    expect(calls.map((c) => [c.method, c.url])).toContainEqual([
+      'PATCH',
+      'https://tasks.googleapis.com/tasks/v1/users/@me/lists/L1',
+    ])
+
+    // Uitzetten: de hele takenlijst weg (met de taken erin), het agenda-item blijft.
+    calls.length = 0
+    const uit = await bijwerken('tok', [{ ...l, naam: 'Afspraken 2', googleLijst: undefined }], hernoemd, () => {})
+    expect(calls[0]).toMatchObject({
+      method: 'DELETE',
+      url: 'https://tasks.googleapis.com/tasks/v1/users/@me/lists/L1',
+    })
+    expect(Object.keys(uit).filter((k) => k.includes('#lijst') || k.startsWith('lijst:'))).toEqual([])
+    expect(uit.t?.soort).toBe('agenda')
+  })
+
+  it('vanuit Google: afvinken, nieuwe taken en verwijderde taken', () => {
+    const opslag: GoogleOpslag = {
+      ...metLijst,
+      't#lijst': { soort: 'tasks', id: 'a', hash: '', takenlijst: 'L1', af: false },
+      'p#lijst': { soort: 'tasks', id: 'b', hash: '', takenlijst: 'L1', af: false },
+      'c#lijst': { soort: 'tasks', id: 'c', hash: '', takenlijst: 'L1', af: false },
+    }
+    const van = vergelijkTaken(heel(), opslag, [
+      { id: 'a', title: 'tandarts', status: 'completed' },
+      { id: 'b', title: 'paspoort ophalen', status: 'needsAction' },
+      { id: 'n', title: 'brood', status: 'needsAction' },
+      { id: 'x', title: 'weg', deleted: true },
+    ])
+    expect(van.af).toEqual([{ itemId: 't', af: true }])
+    expect(van.nieuw.map((t) => t.title)).toEqual(['brood'])
+    expect(van.weg).toEqual(['c#lijst'])
+  })
+
+  it('bij het openen van het lijstje: in Google afgevinkt en nieuw komt in Lijstjes', async () => {
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-id')
+    localStorage.setItem(INGELOGD_KEY, '1')
+    localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: 'tok', tot: Date.now() + 3600000 }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        if ((init.method ?? 'GET') === 'GET' && url.includes('/lists/L1/tasks?'))
+          return new Response(
+            JSON.stringify({
+              items: [
+                { id: 'a', title: 'tandarts', status: 'completed' },
+                { id: 'b', title: 'paspoort ophalen', status: 'needsAction' },
+                { id: 'c', title: 'cadeau voor Anne', status: 'needsAction' },
+                { id: 'n', title: 'brood', status: 'needsAction' },
+              ],
+            }),
+          )
+        return new Response(JSON.stringify({ id: 'x' }))
+      }),
+    )
+    storeAfspraken(heel())
+    localStorage.setItem(
+      GOOGLE_KEY,
+      JSON.stringify({
+        ...metLijst,
+        'h-0#lijst': { soort: 'tasks', id: 'a', hash: '', takenlijst: 'L1', af: false },
+        'h-1#lijst': { soort: 'tasks', id: 'b', hash: '', takenlijst: 'L1', af: false },
+        'h-2#lijst': { soort: 'tasks', id: 'c', hash: '', takenlijst: 'L1', af: false },
+      }),
+    )
+    render(<App />)
+    await act(() => new Promise((r) => setTimeout(r, 1700)))
+    expect(await screen.findByText('brood')).toBeInTheDocument()
+    const opgeslagen = JSON.parse(localStorage.getItem('lijstjes-data')!)[0].items
+    expect(opgeslagen.find((i: { tekst: string }) => i.tekst === 'tandarts').af).toBe(true)
+  })
+
+  it('in Synchroniseren of delen staat de schakelaar Het hele lijstje', async () => {
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-id')
+    localStorage.setItem(INGELOGD_KEY, '1')
+    const user = userEvent.setup()
+    storeAfspraken(afspraken())
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
+    await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
+    const sync = screen.getByRole('region', { name: 'Agenda kiezen' })
+    const schakelaar = within(sync).getByRole('switch', { name: 'Het hele lijstje' })
+    expect(schakelaar).not.toBeChecked()
+    expect(within(sync).getByText(/Een eigen lijst "Afspraken" in Google Tasks met alle items/)).toBeInTheDocument()
+    await user.click(schakelaar)
+    await user.click(within(sync).getByRole('button', { name: 'Bewaren' }))
+    expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.googleLijst).toBe(true)
   })
 })

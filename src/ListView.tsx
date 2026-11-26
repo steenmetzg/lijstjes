@@ -32,6 +32,7 @@ import {
 } from './agenda'
 import {
   heeftDatum,
+  heelInGoogle,
   heeftKenmerken,
   heeftTijd,
   heeftZonderJaar,
@@ -47,7 +48,7 @@ import {
   type Kenmerken,
   type Lijstje,
 } from './lists'
-import { doelen, staatInGoogle, type GoogleOpslag, type Soort } from './google'
+import { doelen, IN_LIJST, LIJST_PREFIX, staatInGoogle, type GoogleOpslag, type Soort } from './google'
 import { MoreAbove, MoreBelow } from './MoreItems'
 import { SyncKeuze } from './SyncKeuze'
 import { useScrollList, type Grip } from './scrollList'
@@ -138,6 +139,8 @@ interface Props {
   onInstellen: (naam: string, kenmerken: Kenmerken, googleAlle?: boolean) => boolean
   /** Google, automatisch: de schakelaar Items met een datum (F48). */
   onGoogleAlle: (alle: boolean) => void
+  /** Google, automatisch: de schakelaar Het hele lijstje (F52). */
+  onGoogleLijst: (heel: boolean) => void
   /** Google, automatisch (F48, F49). */
   google: {
     /** Is Google, automatisch in deze versie ingesteld? */
@@ -473,6 +476,7 @@ export default function ListView({
   reminders,
   onInstellen,
   onGoogleAlle,
+  onGoogleLijst,
   google,
 }: Props) {
   const [text, setText] = useState('')
@@ -485,8 +489,17 @@ export default function ListView({
   const [googleVraag, setGoogleVraag] = useState(false)
   // Omzetten van Google, automatisch naar een andere keuze, of Datum uit: wat met de items die in Google staan (F48)?
   // `verder` doet daarna het omzetten zelf.
-  const [omzetVraag, setOmzetVraag] = useState<{ ids: string[]; verder: () => void } | null>(null)
-  const idsInGoogle = () => lijstje.items.filter((i) => Object.hasOwn(google.opslag, i.id)).map((i) => i.id)
+  const [omzetVraag, setOmzetVraag] = useState<{ keys: string[]; aantal: number; verder: () => void } | null>(null)
+  /** Wat van dit lijstje in Google staat: met `heel` ook de eigen takenlijst en de taken daarin (F52). */
+  const inGoogleVan = (heel: boolean) => {
+    const keys = Object.keys(google.opslag).filter((k) =>
+      heel
+        ? k === LIJST_PREFIX + lijstje.id || lijstje.items.some((i) => k === i.id || k === i.id + IN_LIJST)
+        : lijstje.items.some((i) => k === i.id),
+    )
+    const aantal = lijstje.items.filter((i) => keys.includes(i.id) || keys.includes(i.id + IN_LIJST)).length
+    return { keys, aantal }
+  }
   const googleAuto = lijstje.agenda === GOOGLE_AUTO
   const googleAlle = lijstje.googleAlle !== false
   // De keuze van de agenda: `voor` is het item dat daarna in de agenda gaat (met `wanneer`), of `null` (F34).
@@ -648,9 +661,9 @@ export default function ListView({
     }
     // Van Google, automatisch naar iets anders, met items in Google: eerst vragen wat ermee moet (F48).
     if (voor === null && googleAuto && agenda !== GOOGLE_AUTO) {
-      const ids = idsInGoogle()
-      if (ids.length > 0) {
-        setOmzetVraag({ ids, verder: () => onAgenda(agenda, null) })
+      const { keys, aantal } = inGoogleVan(true)
+      if (keys.length > 0) {
+        setOmzetVraag({ keys, aantal, verder: () => onAgenda(agenda, null) })
         return
       }
     }
@@ -660,7 +673,7 @@ export default function ListView({
   /** Antwoord op de vraag bij het omzetten: de items in Google laten staan of weghalen (F48). */
   function omzetten(laten: boolean) {
     if (!omzetVraag) return
-    if (laten) google.laatStaan(omzetVraag.ids)
+    if (laten) google.laatStaan(omzetVraag.keys)
     omzetVraag.verder()
     setOmzetVraag(null)
   }
@@ -718,7 +731,8 @@ export default function ListView({
     !googleAuto && detailItem?.inAgenda && detailZien && zichtbaar(detailZien, tijd) === detailItem.inAgenda
   // Met een tijd naar Google Agenda, anders naar Google Tasks (F48).
   const googleNaarAgenda = Boolean(detail && tijd && detail.datum && detail.tijd)
-  const gewenst = googleAuto ? doelen([lijstje]) : null
+  const gewenst = googleAuto ? doelen([lijstje], undefined, google.opslag) : null
+  const heel = heelInGoogle(lijstje)
 
   // Een korte foutmelding staat bij het veld waarin je typt: in het open vak, anders onder de invoerregel (F5).
   const fout = notice && ((notice.kind === 'error' && !notice.vast) || notice.bijInvoer) ? notice.text : null
@@ -966,7 +980,7 @@ export default function ListView({
                 {zonderJaar && ' (elk jaar)'}.
               </p>
             )}
-            {datum && googleAuto && (
+            {datum && googleAuto && !(heel && !googleNaarAgenda) && (
               // Google, automatisch: een schakelaar in plaats van In agenda zetten (F48).
               <div className="kenmerken google-kenmerk">
                 <label className={detail.datum ? 'kenmerk' : 'kenmerk off'}>
@@ -1093,8 +1107,11 @@ export default function ListView({
                   if (onInstellen(instellen.naam, instellen.kenmerken)) setInstellen(null)
                 }
                 // Datum uit bij Google, automatisch met items in Google: eerst vragen wat ermee moet (F48).
-                const ids = googleAuto && heeftDatum(lijstje) && !instellen.kenmerken.datum ? idsInGoogle() : []
-                if (ids.length > 0) setOmzetVraag({ ids, verder: bewaar })
+                const { keys, aantal } =
+                  googleAuto && heeftDatum(lijstje) && !instellen.kenmerken.datum
+                    ? inGoogleVan(false)
+                    : { keys: [], aantal: 0 }
+                if (keys.length > 0) setOmzetVraag({ keys, aantal, verder: bewaar })
                 else bewaar()
               }}
             >
@@ -1148,7 +1165,7 @@ export default function ListView({
                   )
                 })}
               </div>
-              {instellen.kenmerken.datum && (
+              {(instellen.kenmerken.datum || lijstje.agenda === GOOGLE_AUTO) && (
                 <p className="instellen-agenda">
                   Synchroniseren of delen: {lijstje.agenda ? keuzeLabel(lijstje.agenda) : 'nog niet gekozen'}{' '}
                   <button
@@ -1180,12 +1197,35 @@ export default function ListView({
             naam={lijstje.naam}
             huidig={lijstje.agenda}
             googleAlle={googleAlle}
+            heel={heel}
+            datum={datum}
             ingelogd={google.ingelogd}
             onInloggen={() => void google.inloggen()}
             onUitloggen={google.uitloggen}
             onAnnuleren={() => setChoosing(null)}
-            onBewaren={(keuze, alle) => {
+            onBewaren={(keuze, alle, heelLijstje) => {
               if (keuze === GOOGLE_AUTO && alle !== googleAlle) onGoogleAlle(alle)
+              if (keuze === GOOGLE_AUTO && heelLijstje !== heel) {
+                // Het hele lijstje uit, terwijl het in Google Tasks staat: eerst vragen wat ermee moet (F52).
+                const lijst = LIJST_PREFIX + lijstje.id
+                const keys = Object.keys(google.opslag).filter(
+                  (k) => k === lijst || lijstje.items.some((i) => k === i.id + IN_LIJST),
+                )
+                if (!heelLijstje && keys.length > 0) {
+                  const aantal = lijstje.items.filter((i) => keys.includes(i.id + IN_LIJST)).length
+                  setChoosing(null)
+                  setOmzetVraag({
+                    keys,
+                    aantal,
+                    verder: () => {
+                      onGoogleLijst(false)
+                      onAgenda(GOOGLE_AUTO, null)
+                    },
+                  })
+                  return
+                }
+                onGoogleLijst(heelLijstje)
+              }
               choose(keuze)
             }}
           />
@@ -1232,9 +1272,9 @@ export default function ListView({
           <section className="confirm clear-choice agenda-choice" aria-label="Items in Google">
             <strong>Items in Google</strong>
             <p>
-              {omzetVraag.ids.length === 1
+              {omzetVraag.aantal === 1
                 ? '1 item van dit lijstje staat in Google Agenda of Google Tasks.'
-                : `${omzetVraag.ids.length} items van dit lijstje staan in Google Agenda of Google Tasks.`}{' '}
+                : `${omzetVraag.aantal} items van dit lijstje staan in Google Agenda of Google Tasks.`}{' '}
               Laat je ze staan, dan past Lijstjes ze daar niet meer aan. Haal je ze weg, dan verdwijnen ze uit Google.
             </p>
             <div className="confirm-buttons drie">
@@ -1281,7 +1321,12 @@ export default function ListView({
             kenmerken={kenmerken}
             onOpen={metKenmerken ? () => openDetail(item) : null}
             vak={detail?.id === item.id && itemVak()}
-            inGoogle={gewenst ? staatInGoogle(google.opslag, item.id, gewenst.get(item.id)) : null}
+            inGoogle={
+              gewenst
+                ? (staatInGoogle(google.opslag, item.id, gewenst.get(item.id)) ??
+                  staatInGoogle(google.opslag, item.id + IN_LIJST, gewenst.get(item.id + IN_LIJST)))
+                : null
+            }
           />
         ))}
         {/* De invoerregel staat als laatste regel in het lijstje (F3, F15). */}
