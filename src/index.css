@@ -732,6 +732,15 @@ h2 {
   grid-template-columns: 1fr 1fr;
 }
 
+/* Drie knoppen naast elkaar: Annuleren, Weghalen, Laten staan (F48). */
+.clear-choice .confirm-buttons.drie {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.clear-choice .confirm-buttons.drie button {
+  padding: 0 6px;
+}
+
 /* Knoppen met twee regels tekst: wat kleinere regelafstand en wat meer ruimte boven en onder. */
 .clear-choice .confirm-buttons button {
   min-height: 48px;
@@ -1701,4 +1710,221 @@ html.vak-open body {
   background: var(--accent);
   border-color: var(--accent);
   border-style: solid;
+}
+
+/* ---- Google, automatisch en Geen agenda (F48 t/m F50) ---- */
+
+/* Een knop over de hele breedte in de agenda-keuze, met een kopje erboven. */
+.clear-choice .confirm-buttons .wide,
+.clear-choice .confirm-buttons .keuze-kop {
+  grid-column: 1 / -1;
+}
+
+.agenda-choice .confirm-buttons .keuze-kop {
+  margin: 4px 0 0;
+}
+
+.google-uitleg {
+  margin: 2px 0 0 !important;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+/* De schakelaar In Google Agenda / In Google Tasks in het kaartje van een item (F48). */
+.google-kenmerk .kenmerk {
+  justify-content: flex-start;
+  gap: 8px;
+  border-bottom: none;
+  color: var(--text);
+}
+
+.google-kenmerk .kenmerk svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.google-kenmerk .kenmerk span {
+  flex: 1;
+}
+
+.google-kenmerk .kenmerk.off svg {
+  color: var(--muted);
+}
+
+.new-version .link-button {
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+/* Synchroniseren of delen: drie hoofdkeuzes als rondjes, met de subkeuzes onder de gekozen keuze (F34, F48, F50). */
+.sync-keuze .sync-optie {
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px solid #c9ced6;
+  border-radius: 12px;
+}
+
+.sync-keuze .sync-optie.gekozen {
+  padding: 10px 11px;
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.sync-keuze .sync-kop {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.sync-keuze .sync-kop input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: var(--accent);
+}
+
+.sync-keuze .sync-titel {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 600;
+}
+
+.sync-keuze .sync-titel svg {
+  color: var(--accent);
+}
+
+.sync-keuze .sync-uitleg {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.sync-keuze .sync-sub {
+  margin: 10px 0 0 32px;
+}
+
+.sync-keuze .sync-sub .kenmerk {
+  padding: 0;
+}
+
+.sync-keuze .sync-vraag {
+  margin: 0 0 6px;
+}
+
+.sync-keuze .sync-agendas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.sync-keuze .sync-agendas button {
+  min-height: 38px;
+  padding: 0 4px;
+  border: 1px solid #c9ced6;
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.sync-keuze .sync-agendas button.confirm-yes {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.sync-keuze > .confirm-buttons {
+  margin-top: 12px;
+}
+
+/* De schakelaars onder Google, automatisch: links, met de naam en de uitleg ernaast (F51). */
+.sync-keuze .sync-schakelaar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.sync-keuze .sync-schakelaar:first-child {
+  margin-top: 0;
+}
+
+.sync-keuze .sync-schakelaar input {
+  flex: none;
+  margin-top: 1px;
+}
+
+.sync-keuze .sync-schakelaar-naam {
+  display: block;
+  font-weight: 500;
+}
+
+.sync-keuze .sync-inlog {
+  margin-top: 12px !important;
+}
+
+/* Kleiner, in verhouding met de rondjes en de tekst ernaast. */
+.sync-keuze .sync-schakelaar .herinnering-switch {
+  width: 28px;
+  height: 16px;
+  margin-top: 3px;
+  border-radius: 8px;
+}
+
+.sync-keuze .sync-schakelaar .herinnering-switch::after {
+  width: 12px;
+  height: 12px;
+}
+
+.sync-keuze .sync-schakelaar .herinnering-switch:checked::after {
+  transform: translateX(12px);
+}
+
+.sync-keuze .sync-schakelaar {
+  gap: 10px;
+}
+
+/* Schakelaar en tekst gecentreerd naast elkaar. */
+.sync-keuze .sync-schakelaar {
+  align-items: center;
+}
+
+.sync-keuze .sync-schakelaar .herinnering-switch {
+  margin-top: 0;
+}
+
+/* De schakelaar staat midden naast de naam; de uitleg springt in tot onder de naam. */
+.sync-keuze .sync-schakelaar {
+  display: block;
+}
+
+.sync-keuze .sync-schakelaar-kop {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.sync-keuze .sync-schakelaar > .sync-uitleg {
+  padding-left: 38px;
+}
+
+/* Het rondje staat midden naast de titel; de uitleg springt in tot onder de titel. */
+.sync-keuze .sync-kop {
+  display: block;
+}
+
+.sync-keuze .sync-titel input {
+  margin: 0 6px 0 0;
+}
+
+.sync-keuze .sync-kop > .sync-uitleg {
+  padding-left: 32px;
 }

@@ -12,6 +12,8 @@
  *   [prullenbak] het prullenbakje
  */
 export const RELEASE_TEKSTEN: Record<string, string> = {
+  '1.9.0':
+    'Nieuw bij [schuifjes] Synchroniseren of delen: met Google, automatisch komen items met een tijd vanzelf in Google Agenda en items zonder tijd in Google Tasks, of het hele lijstje in een eigen lijst in Google Tasks. Of zet items zelf in je agenda, of houd ze alleen in Lijstjes.',
   '1.8.6': 'De naam van een lijstje mag nu 50 tekens lang zijn. De rondjes en knoppen op Mijn lijstjes staan dichter bij elkaar.',
   // Alleen de rondjes en knoppen op Mijn lijstjes netjes uitgelijnd: geen eigen tekst.
   '1.8.5': '',

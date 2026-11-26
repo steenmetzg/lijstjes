@@ -276,7 +276,7 @@ describe('AC27: in de agenda zetten', () => {
     expect(url.hostname).toBe('calendar.google.com')
     expect(url.searchParams.get('text')).toBe('Tandarts')
     expect(url.searchParams.get('dates')).toBe('20261112T093000/20261112T100000')
-    // Het item staat nu in de agenda: een vinkje-agenda achter de datum.
+    // Het item staat nu in de agenda: een vinkje-agenda vóór de datum.
     expect(await screen.findByLabelText('staat in je agenda')).toBeInTheDocument()
 
     // Nog eens: het vak zegt dat het er al in staat, en met dezelfde datum kan het er niet nog eens in.
@@ -297,12 +297,14 @@ describe('AC27: in de agenda zetten', () => {
 
     // Via de schuifjesknop kies je een andere agenda voor het lijstje.
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
-    expect(screen.getByText(/Agenda: Google Agenda/)).toBeInTheDocument()
+    expect(screen.getByText(/Synchroniseren of delen: zelf per item, Google Agenda/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
     const change = screen.getByRole('region', { name: 'Agenda kiezen' })
-    expect(within(change).getByText('Agenda voor Afspraken')).toBeInTheDocument()
+    expect(within(change).getByText('Afspraken synchroniseren of delen')).toBeInTheDocument()
+    expect(within(change).getByRole('radio', { name: 'Zelf per item in je agenda' })).toBeChecked()
     expect(within(change).getByRole('button', { name: 'Google Agenda' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(within(change).getByRole('button', { name: 'Outlook (werk)' }))
+    await user.click(within(change).getByRole('button', { name: 'Bewaren' }))
     expect(open).toHaveBeenCalledTimes(2)
     box = await openDetails(user, 'Anne bellen')
     fireEvent.change(within(box).getByLabelText('Datum'), { target: { value: '21-11-2026' } })
@@ -579,7 +581,7 @@ describe('AC33: herinneringslijstjes van versie 1.6', () => {
     expect(within(box).getByRole('switch', { name: 'Datum' })).toBeChecked()
     expect(within(box).getByRole('switch', { name: 'Tijd' })).toBeChecked()
     expect(within(box).getByRole('switch', { name: 'Notitie' })).not.toBeChecked()
-    expect(within(box).getByText(/Agenda: Google Agenda/)).toBeInTheDocument()
+    expect(within(box).getByText(/Synchroniseren of delen: zelf per item, Google Agenda/)).toBeInTheDocument()
   })
 
   it('een uitgezet herinneringslijstje wordt een gewoon lijstje; met Datum en Tijd komen de datums terug', async () => {
@@ -596,7 +598,7 @@ describe('AC33: herinneringslijstjes van versie 1.6', () => {
 })
 
 describe('AC34: per item kiezen', () => {
-  it('de agenda-keuze toont zes keuzes; Per item kiezen vraagt bij elk item welke agenda', async () => {
+  it('drie hoofdkeuzes; Zelf per item met Elke keer vragen vraagt bij elk item welke agenda', async () => {
     const open = vi.fn()
     vi.stubGlobal('open', open)
     storeAfspraken({ Tandarts: { wanneer: '2026-11-12T09:30' }, APK: { wanneer: '2026-11-20T08:00' } }, 'google')
@@ -605,12 +607,21 @@ describe('AC34: per item kiezen', () => {
     await user.click(screen.getByRole('button', { name: 'Naam en kenmerken van Afspraken' }))
     await user.click(screen.getByRole('button', { name: 'Wijzigen' }))
     const choice = screen.getByRole('region', { name: 'Agenda kiezen' })
+    // Drie hoofdkeuzes; onder Zelf per item de vijf agenda's en Elke keer vragen.
     expect(
       within(choice)
-        .getAllByRole('button')
-        .map((b) => b.textContent),
-    ).toEqual(['Google Agenda', 'Outlook (privé)', 'Outlook (werk)', 'Andere agenda', 'Delen…', 'Per item kiezen'])
-    await user.click(within(choice).getByRole('button', { name: 'Per item kiezen' }))
+        .getAllByRole('radio')
+        .map((r) => r.getAttribute('aria-label')),
+    ).toEqual(['Google, automatisch', 'Zelf per item in je agenda', 'Alleen in Lijstjes'])
+    expect(
+      within(choice)
+        .getAllByRole('button', { pressed: false })
+        .concat(within(choice).getAllByRole('button', { pressed: true }))
+        .map((b) => b.textContent)
+        .sort(),
+    ).toEqual(['Andere agenda', 'Delen…', 'Elke keer vragen', 'Google Agenda', 'Outlook (privé)', 'Outlook (werk)'])
+    await user.click(within(choice).getByRole('button', { name: 'Elke keer vragen' }))
+    await user.click(within(choice).getByRole('button', { name: 'Bewaren' }))
     expect(JSON.parse(localStorage.getItem(KENMERKEN_KEY)!).lijstjes.h.agenda).toBe('per-item')
     for (const [tekst, agenda, host] of [
       ['Tandarts', 'Google Agenda', 'calendar.google.com'],

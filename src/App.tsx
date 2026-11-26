@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Info from './Info'
 import { useInstallPrompt } from './installPrompt'
 import Lists, { type Deleted } from './Lists'
@@ -17,7 +17,11 @@ import {
   heeftZonderJaar,
   saveCurrent,
   saveLijstjes,
+  zetGoogleUit,
+  zetInAgendaGezet,
   capitalize,
+  MAX_AANTAL,
+  MAX_NOTITIE,
   MAX_TEKST,
   sameText,
   setDetails,
@@ -26,9 +30,13 @@ import {
   staatInAgenda,
   type Details,
   type Kenmerken,
+  type Item,
   type Lijstje,
 } from './lists'
-import { isAgenda, PER_ITEM, volgendeKeer, zetInAgenda, zichtbaar, type AgendaKeuze } from './agenda'
+import { GOOGLE_AUTO, isAgenda, PER_ITEM, volgendeKeer, zetInAgenda, zichtbaar, type AgendaKeuze } from './agenda'
+import GoogleMelding from './GoogleMelding'
+import type { Terug } from './google'
+import { useGoogle } from './useGoogle'
 import NewVersion, { Welkom } from './NewVersion'
 import { markVersionSeen, versionToAnnounce, welkomGezien, welkomTonen } from './newVersion'
 import Reminders from './Reminders'
@@ -64,6 +72,45 @@ export default function App() {
     (text) => setNotice({ kind: 'error', text }),
   )
   const lijstje = lijstjes.find((l) => l.id === huidig) ?? lijstjes[0]
+  // Google Agenda en Google Tasks gelijk houden met de lijstjes (F48, F49).
+  // Bij het openen van een lijstje: items die je bij Google zelf hebt verwijderd, gaan uit (F48).
+  const googleVerdwenen = useCallback((ids: string[]) => setLijstjes((all) => zetGoogleUit(all, ids)), [])
+  // Het hele lijstje in Google Tasks: in Google afgevinkt of nieuw toegevoegd komt terug in Lijstjes (F52).
+  const googleVanLijst = useCallback(
+    (lijstjeId: string, wijzig: Terug[], nieuw: Item[]) =>
+      setLijstjes((all) =>
+        all.map((l) =>
+          l.id !== lijstjeId
+            ? l
+            : {
+                ...l,
+                items: [
+                  ...l.items.map((i) => {
+                    const w = wijzig.find((x) => x.itemId === i.id)
+                    if (!w) return i
+                    const { aantal: _a, notitie: _n, ...rest } = i
+                    const aantal = w.aantal !== undefined ? w.aantal.slice(0, MAX_AANTAL) : i.aantal
+                    const notitie = w.notitie !== undefined ? w.notitie.slice(0, MAX_NOTITIE) : i.notitie
+                    return {
+                      ...rest,
+                      ...(w.af !== undefined && { af: w.af }),
+                      ...(w.tekst && { tekst: w.tekst.slice(0, MAX_TEKST) }),
+                      ...(aantal && { aantal }),
+                      ...(notitie && { notitie }),
+                    }
+                  }),
+                  ...nieuw,
+                ],
+              },
+        ),
+      ),
+    [],
+  )
+  const google = useGoogle(lijstjes, screen === 'lijst' ? (lijstje?.id ?? null) : null, googleVerdwenen, googleVanLijst)
+  const [googleMeldingWeg, setGoogleMeldingWeg] = useState(false)
+  useEffect(() => {
+    if (!google.inloggenNodig) setGoogleMeldingWeg(false)
+  }, [google.inloggenNodig])
   // Herinneringen (F36): bij het openen van de app, en als je terugkomt in de app, tot je ze sluit.
   const [showReminders, setShowReminders] = useState(true)
   const due = showReminders ? dueItems(lijstjes) : []
@@ -99,9 +146,18 @@ export default function App() {
       />
     ) : null
 
-  // Onderaan het scherm: eerst het welkom of de melding van een nieuwe versie, dan de herinneringen.
+  const googleMelding =
+    google.inloggenNodig && !googleMeldingWeg ? (
+      <GoogleMelding
+        ingelogd={google.ingelogd}
+        onInloggen={() => void google.inloggen()}
+        onClose={() => setGoogleMeldingWeg(true)}
+      />
+    ) : null
+
+  // Onderaan het scherm: eerst het welkom of de melding van een nieuwe versie, dan Google, dan de herinneringen.
   const reminders =
-    welkom || newVersion || dueMelding ? (
+    welkom || newVersion || googleMelding || dueMelding ? (
       <>
         {welkom && (
           <Welkom
@@ -113,6 +169,7 @@ export default function App() {
           />
         )}
         {newVersion && <NewVersion version={newVersion} onClose={() => setNewVersion(null)} />}
+        {googleMelding}
         {dueMelding}
       </>
     ) : null
@@ -131,6 +188,9 @@ export default function App() {
   }, [notice])
 
   function update(id: string, change: (l: Lijstje) => Lijstje) {
+    // Een wijziging op een lijstje met Google, automatisch: is de toegang verlopen, dan nu (bij de tik) opnieuw
+    // vragen, zodat Google meteen kan worden bijgewerkt (F49).
+    if (lijstjes.find((l) => l.id === id)?.agenda === GOOGLE_AUTO) google.bijTik()
     setLijstjes((all) => all.map((l) => (l.id === id ? change(l) : l)))
   }
 
@@ -252,7 +312,7 @@ export default function App() {
   }
 
   /** Nieuwe naam en kenmerken van het huidige lijstje; `false` als de naam niet kan (F37, F41). */
-  function instellen(naam: string, kenmerken: Kenmerken): boolean {
+  function instellen(naam: string, kenmerken: Kenmerken, googleAlle?: boolean): boolean {
     const l = lijstje
     const anders = naam.trim() !== l.naam
     const problem = anders ? nameError(lijstjes, naam, l.id) : null
@@ -266,8 +326,14 @@ export default function App() {
         .map(([k]) => [k, true]),
     )
     update(l.id, (x) => {
-      const { kenmerken: _oud, ...rest } = x
-      return { ...rest, naam: anders ? naam.trim() : x.naam, ...(Object.keys(aan).length > 0 && { kenmerken: aan }) }
+      const { kenmerken: _oud, googleAlle: _alle, ...rest } = x
+      const alle = googleAlle ?? x.googleAlle !== false
+      return {
+        ...rest,
+        naam: anders ? naam.trim() : x.naam,
+        ...(Object.keys(aan).length > 0 && { kenmerken: aan }),
+        ...(!alle && { googleAlle: false as const }),
+      }
     })
     // Een kenmerk uitzetten verbergt de ingevulde waarden, maar gooit ze niet weg (F41).
     const oud = l.kenmerken ?? {}
@@ -437,6 +503,26 @@ export default function App() {
       onAddDetails={addWithDetails}
       onFout={(text, veld) => setNotice({ kind: 'error', text, ...(veld && { veld }) })}
       onAgenda={agenda}
+      onGoogleLijst={(heel) =>
+        update(lijstje.id, (x) => {
+          const { googleLijst: _heel, ...rest } = x
+          return heel ? { ...rest, googleLijst: true as const } : rest
+        })
+      }
+      onGoogleAlle={(alle) =>
+        update(lijstje.id, (x) => {
+          const { googleAlle: _alle, ...rest } = x
+          return alle ? rest : { ...rest, googleAlle: false as const }
+        })
+      }
+      google={{
+        ...google,
+        // Bij het omzetten in Google laten staan: niet meer bijhouden, wel onthouden dat ze in je agenda staan (F48).
+        laatStaan: (ids) => {
+          google.vergeet(ids)
+          setLijstjes((all) => zetInAgendaGezet(all, ids))
+        },
+      }}
       mic={{
         show: speechEnabled && speechSupported(),
         listening: speech.listening,
