@@ -1928,3 +1928,12 @@ html.vak-open body {
 .sync-keuze .sync-kop > .sync-uitleg {
   padding-left: 32px;
 }
+
+/* Synchroniseren of delen kan langer zijn dan het scherm: zelf scrollen, zodat Bewaren te bereiken is. */
+.sync-keuze,
+.agenda-choice {
+  max-height: calc(100dvh - 90px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
