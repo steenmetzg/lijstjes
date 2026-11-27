@@ -64,6 +64,17 @@ export default function Info({ onClose }: Props) {
           verstuurd, behalve naar Google als je bij een lijstje Google, automatisch kiest.
         </p>
       </section>
+
+      <section className="setting info">
+        <h2>Privacy</h2>
+        <p>
+          Lees wat Lijstjes met je gegevens doet in de{' '}
+          <a href="./privacy.html" target="_blank" rel="noopener">
+            privacyverklaring
+          </a>
+          .
+        </p>
+      </section>
     </main>
   )
 }

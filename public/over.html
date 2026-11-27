@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f6f8" />
+    <meta name="description" content="Lijstjes: snel lijstjes maken door items te typen of in te spreken, met optioneel Google Agenda en Google Tasks." />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <title>Lijstjes</title>
+    <style>
+    :root {
+      --bg: #f5f6f8; --surface: #ffffff; --text: #1f2328; --muted: #6b7280; --line: #e5e7eb;
+      --accent: #1d4ed8; --accent-soft: #eff4ff; --shadow: 0 1px 1.5px rgba(16, 24, 40, 0.12);
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 16px; line-height: 1.5; color: var(--text); background: var(--bg);
+      -webkit-text-size-adjust: 100%;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); }
+    main { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+    header.top { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+    header.top img { width: 56px; height: 56px; border-radius: 14px; box-shadow: var(--shadow); }
+    h1 { font-size: 1.75rem; margin: 0; line-height: 1.2; }
+    .tagline { margin: 2px 0 0; color: var(--muted); }
+    nav.lang { margin: 16px 0 8px; font-size: 0.9rem; color: var(--muted); }
+    section { background: var(--surface); border-radius: 12px; box-shadow: var(--shadow); padding: 16px 18px; margin: 12px 0; }
+    h2 { font-size: 1.1rem; margin: 0 0 6px; }
+    h3 { font-size: 1rem; margin: 14px 0 4px; }
+    p, ul { margin: 0 0 8px; }
+    p:last-child, ul:last-child { margin-bottom: 0; }
+    ul { padding-left: 20px; }
+    li { margin: 3px 0; }
+    a { color: var(--accent); }
+    code { font-size: 0.85em; background: var(--accent-soft); padding: 1px 4px; border-radius: 4px; word-break: break-all; }
+    .button { display: inline-block; margin: 12px 0 4px; padding: 10px 18px; border-radius: 10px; background: var(--accent);
+      color: #fff; text-decoration: none; font-weight: 600; box-shadow: 0 1px 3px rgba(29, 78, 216, 0.35); }
+    .divider { margin: 36px 0 8px; border-top: 1px solid var(--line); padding-top: 24px; }
+    footer { margin-top: 28px; font-size: 0.85rem; color: var(--muted); text-align: center; }
+    footer a { color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <img src="./icon-192.png" alt="" width="56" height="56" />
+        <div>
+          <h1>Lijstjes</h1>
+          <p class="tagline">Snel lijstjes maken door items te typen of in te spreken.</p>
+        </div>
+      </header>
+      <nav class="lang"><a href="#english">English below</a> · <a href="./privacy.html">Privacyverklaring</a></nav>
+
+      <a class="button" href="./">Lijstjes openen</a>
+
+      <section>
+        <h2>Wat doet Lijstjes?</h2>
+        <p>
+          Lijstjes is een eenvoudige, gratis app voor al je lijstjes: boodschappen, klusjes, dingen om in te pakken of
+          wat je maar wilt. Je zet items snel op een lijstje door ze te typen of in te spreken, vinkt ze af als ze klaar
+          zijn, past ze aan of gooit ze weg. Je kunt zoveel lijstjes maken als je wilt, elk met een eigen naam.
+        </p>
+        <p>
+          Per lijstje kies je welke kenmerken je bijhoudt: een aantal, een datum (ook zonder jaar, zoals een
+          verjaardag), een tijd en een notitie. Met een datum staan de items op volgorde en zie je een herinnering in de
+          app als het zover is.
+        </p>
+        <p>
+          Lijstjes is een webapp die je op je telefoon installeert vanuit de browser (Android en iPhone). Hij werkt ook
+          zonder internet en bewaart je lijstjes alleen op je eigen telefoon. Er is geen account en geen server van
+          Lijstjes.
+        </p>
+      </section>
+
+      <section>
+        <h2>Google Agenda en Google Tasks</h2>
+        <p>
+          Als je dat wilt, houdt Lijstjes je items ook bij in Google. Je kiest dat per lijstje met
+          <strong>Google, automatisch</strong> en logt dan één keer in bij Google. Daarna:
+        </p>
+        <ul>
+          <li>komt een item met een datum en een tijd in <strong>Google Agenda</strong> (je hoofdagenda);</li>
+          <li>komt een item met alleen een datum in <strong>Google Tasks</strong>;</li>
+          <li>kun je een heel lijstje als eigen takenlijst in Google Tasks zetten, waarbij wat je daar afvinkt of
+            toevoegt ook in Lijstjes terugkomt;</li>
+          <li>past Lijstjes het in Google aan als je een item wijzigt, afvinkt of weggooit.</li>
+        </ul>
+        <p>
+          Lijstjes vraagt daarvoor alleen toegang tot agenda-afspraken en taken. Alles gaat rechtstreeks van je telefoon
+          naar Google, niet via een server van Lijstjes. Lijstjes gebruikt je gegevens van Google alleen hiervoor. Je kunt
+          op elk moment uitloggen in de app. Lees meer in de <a href="./privacy.html">privacyverklaring</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Contact</h2>
+        <p>
+          Lijstjes is gemaakt door steenmetzg. Vragen of problemen? Laat het weten via
+          <a href="https://github.com/steenmetzg/lijstjes/issues">GitHub</a>.
+        </p>
+      </section>
+
+      <div class="divider" id="english" lang="en">
+        <h1>Lijstjes (English)</h1>
+        <p class="tagline">Quickly make lists by typing or speaking items. The app itself is in Dutch.</p>
+
+        <a class="button" href="./">Open Lijstjes</a>
+
+        <section>
+          <h2>What does Lijstjes do?</h2>
+          <p>
+            Lijstjes ("lists") is a simple, free app for all your lists: groceries, chores, packing lists or anything
+            else. Add items by typing or speaking, tick them off, edit them or throw them away. Make as many named lists
+            as you like, and choose per list whether to keep track of a quantity, a date (also without a year, like a
+            birthday), a time and a note. Dated items are sorted and the app reminds you when they are due.
+          </p>
+          <p>
+            Lijstjes is a web app (PWA) that you install on your phone from the browser (Android and iPhone). It works
+            offline and keeps your lists only on your own phone. There is no account and no Lijstjes server.
+          </p>
+        </section>
+
+        <section>
+          <h2>Google Calendar and Google Tasks</h2>
+          <p>
+            If you want, Lijstjes keeps your items in Google too. You turn this on per list with
+            <strong>Google, automatisch</strong> and sign in with Google once. Then items with a date and a time go to
+            your primary <strong>Google Calendar</strong>, items with only a date go to <strong>Google Tasks</strong>,
+            and a whole list can be kept as its own task list in Google Tasks (changes you make there come back to
+            Lijstjes). When you edit, tick off or delete an item, Lijstjes updates it in Google.
+          </p>
+          <p>
+            Lijstjes only asks for access to calendar events and tasks. Everything goes directly from your phone to
+            Google, never through a Lijstjes server, and Google user data is used for this feature only. You can sign
+            out in the app at any time. See the <a href="./privacy.html#english">privacy policy</a>.
+          </p>
+        </section>
+
+        <section>
+          <h2>Contact</h2>
+          <p>
+            Lijstjes is made by steenmetzg. Questions or problems? Please use
+            <a href="https://github.com/steenmetzg/lijstjes/issues">GitHub</a>.
+          </p>
+        </section>
+      </div>
+
+      <footer>
+        <a href="./privacy.html">Privacyverklaring / Privacy policy</a> · <a href="./">Lijstjes openen</a>
+      </footer>
+    </main>
+  </body>
+</html>
